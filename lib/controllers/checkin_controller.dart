@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/controllers/home_controller.dart';
 import 'package:room_to_read/models/book_model.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/services/api_service.dart';
 import 'package:room_to_read/services/connectivity_service.dart';
 import 'package:room_to_read/services/enhanced_offline_service.dart';
@@ -21,7 +22,7 @@ class CheckinController extends GetxController {
   var selectedRecord = Rxn<Map<String, dynamic>>();
   var selectedCondition = 'good'.obs; // Add selectedCondition variable
   var selectedClass = Rxn<String>(); // Add selectedClass variable
-  var classes = <String>[].obs; // Add classes variable
+  var classes = <Grade>[].obs; // Add classes variable
   var dateFromFilter = ''.obs; // Add dateFromFilter variable
   var dateToFilter = ''.obs; // Add dateToFilter variable
   var checkedOutBooks = <Map<String, dynamic>>[].obs;
@@ -203,8 +204,7 @@ class CheckinController extends GetxController {
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
 
-      filteredRecords.clear();
-      searchQuery.value = '';
+      _applyFilters();
 
       // ✅ DEBUG: Print all books in the list
       print('\n📚 ========== CHECKED OUT BOOKS LIST ==========');
@@ -1024,16 +1024,13 @@ class CheckinController extends GetxController {
     selectedCondition.value = condition;
   }
 
-  void selectClass(String className) {
-    selectedClass.value = className;
-
-    // Apply class filter to the list
-    _applyFilters();
+  void selectClass(Grade grade) {
+    selectedClass.value = grade.name;
+    fetchCheckedOutBooks();
   }
 
   /// ✅ Apply all filters (class + search)
   void _applyFilters() {
-    // Start with all books
     List<Map<String, dynamic>> filtered = checkedOutBooks.toList();
 
     // Apply class filter
@@ -1041,9 +1038,31 @@ class CheckinController extends GetxController {
       filtered = filtered.where((book) {
         final bookClass =
             book['F4_TXT1']?.toString() ?? book['className']?.toString() ?? '';
-        final matches = bookClass == selectedClass.value;
-        if (!matches) {}
-        return matches;
+        return bookClass == selectedClass.value;
+      }).toList();
+    }
+
+    // Apply date range filter
+    if (dateFromFilter.value.isNotEmpty || dateToFilter.value.isNotEmpty) {
+      filtered = filtered.where((book) {
+        final rawDate =
+            book['F4_DATE1']?.toString() ?? book['F4_DATE']?.toString() ?? '';
+        if (rawDate.isEmpty) return true;
+
+        final bookDate = DateTime.tryParse(rawDate);
+        if (bookDate == null) return true;
+
+        if (dateFromFilter.value.isNotEmpty) {
+          final from = DateTime.tryParse(dateFromFilter.value);
+          if (from != null && bookDate.isBefore(from)) return false;
+        }
+
+        if (dateToFilter.value.isNotEmpty) {
+          final to = DateTime.tryParse(dateToFilter.value);
+          if (to != null && bookDate.isAfter(to)) return false;
+        }
+
+        return true;
       }).toList();
     }
 
@@ -1064,7 +1083,10 @@ class CheckinController extends GetxController {
   /// ✅ Clear class filter
   void clearClassFilter() {
     selectedClass.value = null;
-    _applyFilters();
+    checkedOutBooks.clear(); // Clear data when class is deselected
+    filteredRecords.clear();
+    dateFromFilter.value = ''; // Reset date filters too
+    dateToFilter.value = '';
   }
 
   void selectRecordByData(Map<String, dynamic> record) {
@@ -1096,14 +1118,15 @@ class CheckinController extends GetxController {
   void setDateFilter(String from, String to) {
     dateFromFilter.value = from;
     dateToFilter.value = to;
-    fetchCheckedOutBooks(); // Refresh data with new filters
+    // Only re-filter existing data, don't re-fetch (which would lose class context)
+    _applyFilters();
   }
 
   // Fetch classes method
   Future<void> fetchClasses() async {
     try {
-      final classList = await apiService.getClasses();
-      classes.value = classList;
+      final gradeList = await apiService.getGrades();
+      classes.value = gradeList;
     } catch (e) {
       classes.value = [];
     }

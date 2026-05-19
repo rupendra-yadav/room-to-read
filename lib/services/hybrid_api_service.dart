@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:room_to_read/models/book_model.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/models/student_model.dart';
 import 'package:room_to_read/services/api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
@@ -1078,6 +1079,18 @@ class HybridApiService extends GetxService {
         print('⚠️ Classes download failed: $e');
       }
 
+      // Download grades
+      print('🎓 Downloading grades...');
+      try {
+        final grades = await _apiService.getGrades();
+        if (grades.isNotEmpty) {
+          await _cacheGradesOffline(grades);
+          print('✅ Cached ${grades.length} grades');
+        }
+      } catch (e) {
+        print('⚠️ Grades download failed: $e');
+      }
+
       print('🎉 Manual data download completed successfully');
 
       return {
@@ -1087,6 +1100,71 @@ class HybridApiService extends GetxService {
     } catch (e) {
       print('❌ Error in manual data download: $e');
       return {'success': false, 'message': 'डेटा डाउनलोड में त्रुटि: $e'};
+    }
+  }
+
+  Future<List<Grade>> getGrades() async {
+    try {
+      if (_connectivityService.isOnline.value) {
+        print('🌐 Online: Fetching grades from API...');
+        final online = await _apiService.getGrades();
+
+        if (online.isNotEmpty) {
+          print('✅ API returned ${online.length} grades, caching them');
+          await _cacheGradesOffline(online);
+          return online;
+        }
+        print('⚠️ API returned empty grades list');
+      }
+
+      print('📱 Fetching grades from offline cache...');
+      return await _getGradesOffline();
+    } catch (e) {
+      print('❌ Error getting grades: $e');
+      return [];
+    }
+  }
+
+  Future<void> _cacheGradesOffline(List<Grade> grades) async {
+    try {
+      final db = await _offlineDb.database;
+      await db.delete('grades_cache');
+      final batch = db.batch();
+      for (final grade in grades) {
+        batch.insert('grades_cache', {
+          'code': grade.code,
+          'name': grade.name,
+          'cached_at': DateTime.now().toIso8601String(),
+        });
+      }
+      await batch.commit(noResult: true);
+      print('💾 Cached ${grades.length} grades offline');
+    } catch (e) {
+      print('❌ Error caching grades: $e');
+    }
+  }
+
+  Future<List<Grade>> _getGradesOffline() async {
+    try {
+      final db = await _offlineDb.database;
+      final rows = await db.query(
+        'grades_cache',
+        orderBy: 'CAST(name AS INTEGER) ASC',
+      );
+      if (rows.isEmpty) {
+        print('⚠️ No cached grades found');
+        return [];
+      }
+      print('✅ Loaded ${rows.length} cached grades');
+      return rows
+          .map(
+            (row) =>
+                Grade(code: row['code'] as String, name: row['name'] as String),
+          )
+          .toList();
+    } catch (e) {
+      print('❌ Error reading cached grades: $e');
+      return [];
     }
   }
 }

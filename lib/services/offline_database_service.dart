@@ -29,13 +29,17 @@ class OfflineDatabaseService extends GetxService {
     print('🔄 Database upgrade: v$oldVersion → v$newVersion');
 
     if (oldVersion < 2) {
-      print('📝 Upgrading to v2: Adding F4_LCODE column to checked_out_books...');
+      print(
+        '📝 Upgrading to v2: Adding F4_LCODE column to checked_out_books...',
+      );
       try {
         // Check if column already exists
         final tableInfo = await db.rawQuery(
           "PRAGMA table_info(checked_out_books)",
         );
-        final hasF4LcodeColumn = tableInfo.any((col) => col['name'] == 'F4_LCODE');
+        final hasF4LcodeColumn = tableInfo.any(
+          (col) => col['name'] == 'F4_LCODE',
+        );
 
         if (!hasF4LcodeColumn) {
           await db.execute(
@@ -229,6 +233,15 @@ class OfflineDatabaseService extends GetxService {
         is_valid INTEGER DEFAULT 1
       )
     ''');
+
+    await db.execute('''
+  CREATE TABLE IF NOT EXISTS grades_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    cached_at TEXT NOT NULL
+  )
+''');
 
     print('✅ Database initialized successfully');
   }
@@ -470,7 +483,8 @@ class OfflineDatabaseService extends GetxService {
 
         if (books.isNotEmpty) {
           // Try to get the numeric book code (F4_LCODE)
-          final f4LcodeFromDb = books.first['bookId']?.toString() ??
+          final f4LcodeFromDb =
+              books.first['bookId']?.toString() ??
               books.first['no']?.toString() ??
               books.first['code']?.toString();
           if (f4LcodeFromDb != null && f4LcodeFromDb.isNotEmpty) {
@@ -529,7 +543,8 @@ class OfflineDatabaseService extends GetxService {
         'bookId': bookId,
         'bookName': bookName,
         'bookCode': bookCode,
-        'F4_LCODE': f4Lcode, // ✅ FIXED: Store resolved F4_LCODE (numeric book code) for display
+        'F4_LCODE':
+            f4Lcode, // ✅ FIXED: Store resolved F4_LCODE (numeric book code) for display
         'className': className,
         'checkoutDate': DateTime.now().toIso8601String(),
         'dueDate': DateTime.now()
@@ -1008,15 +1023,15 @@ class OfflineDatabaseService extends GetxService {
       print('🧹 Clearing old checked-out books from API (synced=1)...');
       final deletedCount = await db.delete(
         'checked_out_books',
-        where: 'synced = 1', // Only delete books from API, keep offline transactions
+        where:
+            'synced = 1', // Only delete books from API, keep offline transactions
       );
       print('   ✅ Deleted $deletedCount old books from API');
 
       // ✅ NEW: Also clear books that have been checked in (marked as consumed)
       // These are books where the original checkout was marked as consumed (sync_status=2)
       print('🧹 Clearing books with consumed checkouts...');
-      final consumedCheckouts = await db.rawQuery(
-        '''
+      final consumedCheckouts = await db.rawQuery('''
         SELECT DISTINCT bookCode, studentId, teacherId FROM checked_out_books
         WHERE synced = 0 AND EXISTS (
           SELECT 1 FROM offline_transactions_enhanced
@@ -1026,22 +1041,23 @@ class OfflineDatabaseService extends GetxService {
             AND teacher_id = checked_out_books.teacherId
             AND sync_status = 2
         )
-        '''
-      );
-      
+        ''');
+
       for (final record in consumedCheckouts) {
         final bookCode = record['bookCode'];
         final studentId = record['studentId'];
         final teacherId = record['teacherId'];
-        
+
         final deletedConsumed = await db.delete(
           'checked_out_books',
           where: 'bookCode = ? AND studentId = ? AND teacherId = ?',
           whereArgs: [bookCode, studentId, teacherId],
         );
-        
+
         if (deletedConsumed > 0) {
-          print('   ✅ Deleted consumed checkout: $bookCode (student: $studentId)');
+          print(
+            '   ✅ Deleted consumed checkout: $bookCode (student: $studentId)',
+          );
         }
       }
 
@@ -1055,7 +1071,10 @@ class OfflineDatabaseService extends GetxService {
           'bookId': book['bookId'] ?? '',
           'bookName': book['F4_PARTYN'] ?? book['bookName'] ?? '',
           'bookCode': book['F4_LCODE'] ?? book['bookCode'] ?? '',
-          'F4_LCODE': book['F4_LCODE'] ?? book['bookCode'] ?? '', // ✅ NEW: Store F4_LCODE for display
+          'F4_LCODE':
+              book['F4_LCODE'] ??
+              book['bookCode'] ??
+              '', // ✅ NEW: Store F4_LCODE for display
           'className': book['F4_TXT1'] ?? book['className'] ?? '',
           'checkoutDate': book['F4_USERDT'] ?? book['checkoutDate'] ?? '',
           'dueDate': book['dueDate'] ?? '',

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/controllers/checkin_controller.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
 import 'package:room_to_read/widgets/shimmer_loading.dart';
 import 'package:room_to_read/widgets/offline_status_widget.dart';
@@ -136,31 +137,43 @@ class CheckinPage extends GetView<CheckinController> {
                                         horizontal: 12,
                                       ),
                                       child: Obx(
-                                        () => DropdownButton<String>(
-                                          value: controller.selectedClass.value,
-                                          isExpanded: true,
-                                          underline: const SizedBox(),
-                                          hint: const Text('कक्षा चुनें'),
-                                          items: controller.classes.map((
-                                            String value,
-                                          ) {
-                                            return DropdownMenuItem<String>(
-                                              value: value,
-                                              child: Text(
-                                                value,
-                                                style: TextStyle(
-                                                  fontSize: isMobile ? 14 : 15,
-                                                  color: Colors.black,
-                                                ),
-                                              ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (String? newValue) {
-                                            if (newValue != null) {
-                                              controller.selectClass(newValue);
-                                            }
-                                          },
-                                        ),
+                                        () =>
+                                            DropdownButton<Grade>(
+                                              value: controller.classes
+                                                  .firstWhereOrNull(
+                                                    (g) =>
+                                                        g.name ==
+                                                        controller
+                                                            .selectedClass
+                                                            .value,
+                                                  ),
+                                              isExpanded: true,
+                                              underline: const SizedBox(),
+                                              hint: const Text('ग्रेड चुनें'),
+                                              items: controller.classes.map((
+                                                Grade grade,
+                                              ) {
+                                                return DropdownMenuItem<Grade>(
+                                                  value: grade,
+                                                  child: Text(
+                                                    'ग्रेड: ${grade.name}',
+                                                    style: TextStyle(
+                                                      fontSize: isMobile
+                                                          ? 14
+                                                          : 15,
+                                                      color: Colors.black,
+                                                    ),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                              onChanged: (Grade? newValue) {
+                                                if (newValue != null) {
+                                                  controller.selectClass(
+                                                    newValue,
+                                                  );
+                                                }
+                                              },
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -804,7 +817,7 @@ class CheckinPage extends GetView<CheckinController> {
                                               ),
                                               child: _buildStudentRecord(
                                                 studentName,
-                                                'कक्षा: $className',
+                                                'ग्रेड: $className',
                                                 bookName,
                                                 formattedDueDate,
                                                 isOverdue ? 'अतिदेय' : '',

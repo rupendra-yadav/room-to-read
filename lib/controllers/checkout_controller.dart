@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/controllers/checkin_controller.dart';
 import 'package:room_to_read/controllers/student_controller.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/services/hybrid_api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
 import 'package:room_to_read/services/offline_database_service.dart';
@@ -28,7 +29,7 @@ class CheckoutController extends GetxController {
   var studentSearchQuery = ''.obs;
   var bookSearchQuery = ''.obs;
   var checkoutHistory = <Map<String, dynamic>>[].obs;
-  var classes = <String>[].obs;
+  var classes = <Grade>[].obs;
   var isLoading = false.obs;
 
   @override
@@ -171,43 +172,34 @@ class CheckoutController extends GetxController {
   Future<void> fetchClasses() async {
     try {
       isLoading.value = true;
-      print('📚 Fetching classes from HybridApiService...');
+      print('📚 Fetching grades from HybridApiService...');
 
-      final classList = await apiService.getClasses();
+      final gradeList = await apiService.getGrades();
 
-      print('   Classes returned: ${classList.length}');
+      print('   Grades returned: ${gradeList.length}');
 
-      if (classList.isEmpty) {
-        print('⚠️ No classes available from API or cache');
+      if (gradeList.isEmpty) {
+        print('⚠️ No grades available from API or cache');
         classes.value = [];
-
-        // Show message but don't block - user can still try to checkout if offline
         if (_connectivityService.isOnline.value) {
           Get.snackbar(
             'जानकारी',
-            'कोई कक्षा सूचना उपलब्ध नहीं है। कृपया ऑनलाइन होकर "डेटा डाउनलोड करें" दबाएं।',
+            'कोई ग्रेड सूचना उपलब्ध नहीं है।',
             backgroundColor: Colors.orange,
             colorText: Colors.white,
             duration: const Duration(seconds: 3),
           );
         }
       } else {
-        print('✅ Classes loaded: ${classList.length} items');
-        for (
-          int i = 0;
-          i < (classList.length > 5 ? 5 : classList.length);
-          i++
-        ) {
-          print('   • कक्षा: ${classList[i]}');
-        }
-        classes.value = classList;
+        print('✅ Grades loaded: ${gradeList.length} items');
+        classes.value = gradeList;
       }
     } catch (e) {
-      print('⚠️ Error fetching classes: $e');
+      print('⚠️ Error fetching grades: $e');
       classes.value = [];
       Get.snackbar(
         'त्रुटि',
-        'कक्षाएं लोड करने में विफल: $e',
+        'ग्रेड लोड करने में विफल: $e',
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -217,8 +209,8 @@ class CheckoutController extends GetxController {
     }
   }
 
-  void selectClass(String className) {
-    selectedClass.value = className;
+  void selectClass(Grade grade) {
+    selectedClass.value = grade.name; // store name for display/API use
   }
 
   void selectStudent(dynamic student) {

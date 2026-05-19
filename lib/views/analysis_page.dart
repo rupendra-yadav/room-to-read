@@ -140,7 +140,7 @@ class AnalysisPage extends GetView<AnalysisController> {
                             () => Column(
                               children: [
                                 _buildSummaryRow(
-                                  'कक्षा',
+                                  'ग्रेड',
                                   controller.selectedClass.value,
                                   isMobile,
                                 ),
@@ -399,14 +399,14 @@ class AnalysisPage extends GetView<AnalysisController> {
                             ),
                           ),
                         ),
-                        Text(
-                          'विस्तार देखें',
-                          style: TextStyle(
-                            fontSize: isMobile ? 12 : 13,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        // Text(
+                        //   'विस्तार देखें',
+                        //   style: TextStyle(
+                        //     fontSize: isMobile ? 12 : 13,
+                        //     color: Colors.blue,
+                        //     fontWeight: FontWeight.w500,
+                        //   ),
+                        // ),
                       ],
                     ),
                     SizedBox(height: isMobile ? 10 : 12),

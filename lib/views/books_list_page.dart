@@ -265,6 +265,7 @@ class BooksListPage extends GetView<BookController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Primary name (book_name / Hindi)
                   Text(
                     book.bookName,
                     style: TextStyle(
@@ -275,25 +276,45 @@ class BooksListPage extends GetView<BookController> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    book.bookLocalName,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: isMobile ? 12 : 13,
+                  // Roman name
+                  if (book.bookRomanName != null &&
+                      book.bookRomanName.toString().isNotEmpty)
+                    Text(
+                      book.bookRomanName,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: isMobile ? 12 : 13,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  // Local name — only show if different from bookName to avoid duplication
+                  if (book.bookLocalName != null &&
+                      book.bookLocalName.toString().isNotEmpty &&
+                      book.bookLocalName.toString() != book.bookName.toString())
+                    Text(
+                      book.bookLocalName,
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: isMobile ? 11 : 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  SizedBox(height: isMobile ? 4 : 6),
+                  // Author
                   Text(
-                    book.bookRomanName,
+                    book.authorName,
                     style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: isMobile ? 12 : 13,
+                      color: Colors.grey[500],
+                      fontSize: isMobile ? 11 : 12,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: isMobile ? 4 : 6),
+                  // Availability badge
                   Row(
                     children: [
                       Container(
@@ -307,7 +328,7 @@ class BooksListPage extends GetView<BookController> {
                         ),
                         child: Text(
                           isAvailable
-                              ? '${book.availableCopy} उपलब्ध'
+                              ? '${book.availableCopies} उपलब्ध'
                               : 'अनुपलब्ध',
                           style: TextStyle(
                             color: statusColor,

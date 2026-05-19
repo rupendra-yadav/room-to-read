@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
     <application
-        android:label="room_to_read"
+        android:label="Room to read"
         android:name="${applicationName}"
         android:icon="@mipmap/logo">
         <activity

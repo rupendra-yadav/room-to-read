@@ -30,10 +30,10 @@ class StudentController extends GetxController {
     // Get current user's M1_CODE (teacher ID) - defined at method scope for catch block access
     final currentUser = _authService.currentUser.value;
     final teacherId = currentUser?.code; // Use M1_CODE as teacher ID
-    
+
     try {
       isLoading.value = true;
-      
+
       print('Loading students for teacher ID: $teacherId');
 
       // Fetch classes
@@ -48,24 +48,32 @@ class StudentController extends GetxController {
       // Filter students by M1_GROUP2 matching teacher ID
       students.value = allStudents.where((student) {
         final matches = student.teacherId == teacherId;
-        print('Student ${student.name}: teacherId=${student.teacherId}, matches=$matches');
+        print(
+          'Student ${student.name}: teacherId=${student.teacherId}, matches=$matches',
+        );
         return matches;
       }).toList();
 
       print('Students after filtering by teacher: ${students.length} items');
-      
+
       // Show all students initially (no pagination limit)
       if (students.isNotEmpty) {
         filteredStudents.value = students;
         print('Showing all ${filteredStudents.length} students');
       } else {
-        print('⚠️ No students found from hybrid API, trying offline database...');
-        
+        print(
+          '⚠️ No students found from hybrid API, trying offline database...',
+        );
+
         // Try to load from offline database directly as fallback
         final offlineDb = Get.find<OfflineDatabaseService>();
-        final offlineStudents = await offlineDb.getStudentsOffline(teacherId: teacherId);
-        print('📱 Found ${offlineStudents.length} students in offline database');
-        
+        final offlineStudents = await offlineDb.getStudentsOffline(
+          teacherId: teacherId,
+        );
+        print(
+          '📱 Found ${offlineStudents.length} students in offline database',
+        );
+
         if (offlineStudents.isNotEmpty) {
           // Convert offline data to Student objects
           final offlineStudentList = offlineStudents.map((data) {
@@ -77,15 +85,19 @@ class StudentController extends GetxController {
               readingLevel: data['readingLevel'] ?? 0,
               currentLevel: data['currentLevel'] ?? 0,
               booksIssued: data['booksIssued'] ?? 0,
-              lastUpdated: DateTime.tryParse(data['lastUpdated'] ?? '') ?? DateTime.now(),
+              lastUpdated:
+                  DateTime.tryParse(data['lastUpdated'] ?? '') ??
+                  DateTime.now(),
               previousLevel: data['previousLevel'] ?? 0,
               teacherId: data['teacherId'] ?? '',
             );
           }).toList();
-          
+
           students.value = offlineStudentList;
           filteredStudents.value = offlineStudentList;
-          print('✅ Loaded ${offlineStudentList.length} students from offline database');
+          print(
+            '✅ Loaded ${offlineStudentList.length} students from offline database',
+          );
         } else {
           filteredStudents.value = [];
           print('No students found in offline database');
@@ -93,14 +105,18 @@ class StudentController extends GetxController {
       }
     } catch (e) {
       print('Error in loadStudents: $e');
-      
+
       // Final fallback to offline database
       try {
         print('🆘 Final fallback to offline database...');
         final offlineDb = Get.find<OfflineDatabaseService>();
-        final offlineStudents = await offlineDb.getStudentsOffline(teacherId: teacherId);
-        print('📱 Fallback found ${offlineStudents.length} students in offline database');
-        
+        final offlineStudents = await offlineDb.getStudentsOffline(
+          teacherId: teacherId,
+        );
+        print(
+          '📱 Fallback found ${offlineStudents.length} students in offline database',
+        );
+
         if (offlineStudents.isNotEmpty) {
           final offlineStudentList = offlineStudents.map((data) {
             return Student(
@@ -111,20 +127,24 @@ class StudentController extends GetxController {
               readingLevel: data['readingLevel'] ?? 0,
               currentLevel: data['currentLevel'] ?? 0,
               booksIssued: data['booksIssued'] ?? 0,
-              lastUpdated: DateTime.tryParse(data['lastUpdated'] ?? '') ?? DateTime.now(),
+              lastUpdated:
+                  DateTime.tryParse(data['lastUpdated'] ?? '') ??
+                  DateTime.now(),
               previousLevel: data['previousLevel'] ?? 0,
               teacherId: data['teacherId'] ?? '',
             );
           }).toList();
-          
+
           students.value = offlineStudentList;
           filteredStudents.value = offlineStudentList;
-          print('✅ Fallback loaded ${offlineStudentList.length} students from offline database');
+          print(
+            '✅ Fallback loaded ${offlineStudentList.length} students from offline database',
+          );
         }
       } catch (fallbackError) {
         print('❌ Even fallback failed: $fallbackError');
       }
-      
+
       Get.snackbar('Error', 'Failed to load students: $e');
     } finally {
       isLoading.value = false;
@@ -139,9 +159,13 @@ class StudentController extends GetxController {
   // Remove student from filtered list (used after selection in checkout)
   void removeStudentFromFilteredList(Student student) {
     try {
-      filteredStudents.removeWhere((s) => s.id == student.id || s.code == student.code);
+      filteredStudents.removeWhere(
+        (s) => s.id == student.id || s.code == student.code,
+      );
       print('✅ Removed student ${student.name} from filtered list');
-      print('📊 Remaining students in filtered list: ${filteredStudents.length}');
+      print(
+        '📊 Remaining students in filtered list: ${filteredStudents.length}',
+      );
     } catch (e) {
       print('❌ Error removing student from filtered list: $e');
     }
@@ -151,7 +175,9 @@ class StudentController extends GetxController {
   void addStudentBackToFilteredList(Student student) {
     try {
       // Check if student is not already in the list
-      final exists = filteredStudents.any((s) => s.id == student.id || s.code == student.code);
+      final exists = filteredStudents.any(
+        (s) => s.id == student.id || s.code == student.code,
+      );
       if (!exists) {
         // Add student back and re-apply current filters
         applyFilters();
@@ -163,29 +189,41 @@ class StudentController extends GetxController {
   }
 
   void applyFilters() {
+    print('🔍 applyFilters called:');
+    print('   filterType: "${filterType.value}"');
+    print('   searchQuery: "${searchQuery.value}"');
+    print('   total students: ${students.length}');
+
     var result = students.toList();
 
-    // Filter by class if filterType is set
     if (filterType.value != 'सभी' && filterType.value.isNotEmpty) {
-      result = result
-          .where((student) => student.className == filterType.value)
-          .toList();
+      result = result.where((student) {
+        final grades = student.className
+            .split(',')
+            .map((g) => g.trim())
+            .toList();
+        return grades.contains(filterType.value);
+      }).toList();
+      print('   after grade filter: ${result.length}');
     }
-    
-    // Apply search filter if there's a search query
+
     if (searchQuery.value.isNotEmpty) {
+      final query = searchQuery.value.toLowerCase().trim();
+      print('   🔎 All 57 grade-filtered names:');
+  for (final s in result) {
+    print('     "${s.name}" | trimmed: "${s.name.trim()}" | lower: "${s.name.toLowerCase().trim()}" | contains aa: ${s.name.toLowerCase().trim().contains("aa")}');
+  }
       result = result
           .where(
             (student) =>
-                student.name
-                    .toLowerCase()
-                    .contains(searchQuery.value.toLowerCase()) ||
-                student.id.contains(searchQuery.value),
+                student.name.toLowerCase().trim().contains(query) ||
+                student.id.trim().contains(query) ||
+                student.code.trim().contains(query),
           )
           .toList();
+      print('   after search filter: ${result.length}');
     }
 
-    // Show filtered results
     filteredStudents.value = result;
   }
 
@@ -211,10 +249,10 @@ class StudentController extends GetxController {
     try {
       isLoading.value = true;
       print('🔄 Manually downloading and caching student data...');
-      
+
       final currentUser = _authService.currentUser.value;
       final teacherId = currentUser?.code;
-      
+
       if (currentUser == null) {
         Get.snackbar('Error', 'कृपया पहले लॉगिन करें');
         return;
@@ -230,18 +268,24 @@ class StudentController extends GetxController {
       print('📡 Downloading fresh student data from API...');
       final apiService = Get.find<ApiService>();
       final freshStudents = await apiService.getStudents(group1: teacherId);
-      
+
       if (freshStudents.isNotEmpty) {
-        print('💾 Saving ${freshStudents.length} students to offline storage...');
-        
+        print(
+          '💾 Saving ${freshStudents.length} students to offline storage...',
+        );
+
         // Convert to proper format for offline storage (use the API response format directly)
         final offlineDb = Get.find<OfflineDatabaseService>();
-        await offlineDb.saveStudentsOffline(freshStudents.cast<Map<String, dynamic>>());
-        print('✅ Successfully saved ${freshStudents.length} students to offline storage');
-        
+        await offlineDb.saveStudentsOffline(
+          freshStudents.cast<Map<String, dynamic>>(),
+        );
+        print(
+          '✅ Successfully saved ${freshStudents.length} students to offline storage',
+        );
+
         // Reload students from offline storage to verify
         await loadStudents();
-        
+
         Get.snackbar(
           'सफल',
           '${freshStudents.length} छात्र डाउनलोड और सेव हो गए',

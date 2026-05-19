@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/services/hybrid_api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
 
@@ -15,7 +16,7 @@ class CicoReportController extends GetxController {
   var searchQuery = ''.obs;
   var bookIssues = <Map<String, dynamic>>[].obs;
   var filteredBookIssues = <Map<String, dynamic>>[].obs;
-  var classes = <String>[].obs;
+  var grades = <Grade>[].obs;
   var isLoading = false.obs;
 
   final TextEditingController searchController = TextEditingController();
@@ -25,7 +26,7 @@ class CicoReportController extends GetxController {
   void onInit() {
     super.onInit();
     apiService = Get.find<HybridApiService>();
-    fetchClassesOnly(); // ← only fetch classes
+    fetchGradesOnly(); // ← only fetch classes
   }
 
   @override
@@ -34,13 +35,13 @@ class CicoReportController extends GetxController {
     super.onClose();
   }
 
-  Future<void> fetchClassesOnly() async {
+  Future<void> fetchGradesOnly() async {
     try {
       isLoading.value = true;
-      final classList = await apiService.getClasses();
-      classes.value = classList;
+      final gradeList = await apiService.getGrades();
+      grades.value = gradeList;
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load classes: $e');
+      Get.snackbar('Error', 'Failed to load grades: $e');
     } finally {
       isLoading.value = false;
     }
@@ -53,9 +54,8 @@ class CicoReportController extends GetxController {
 
       // Fetch classes
       print('📚 Fetching classes...');
-      final classList = await apiService.getClasses();
-      classes.value = classList;
-      print('✅ Classes fetched: ${classList.length}');
+     final gradeList = await apiService.getGrades();
+grades.value = gradeList;
 
       // Fetch CICO report initially
       print('📊 Fetching initial CICO report...');
@@ -230,10 +230,9 @@ class CicoReportController extends GetxController {
     print('🎉 Report processing completed successfully from $source');
   }
 
-  void selectClass(String className) {
-    selectedClass.value = className;
-    // Fetch books for the selected class
-    fetchBookIssues(className: className);
+  void selectClass(Grade grade) {
+    selectedClass.value = grade.name;
+    fetchBookIssues(className: grade.name);
   }
 
   void searchRecords(String query) {
@@ -344,7 +343,6 @@ class CicoReportController extends GetxController {
     print('🐛 Controller instance: ${this.hashCode}');
     print('🐛 bookIssues length: ${bookIssues.length}');
     print('🐛 filteredBookIssues length: ${filteredBookIssues.length}');
-    print('🐛 classes length: ${classes.length}');
     print('🐛 selectedClass: ${selectedClass.value}');
     print('🐛 dateFromFilter: "${dateFromFilter.value}"');
     print('🐛 dateToFilter: "${dateToFilter.value}"');

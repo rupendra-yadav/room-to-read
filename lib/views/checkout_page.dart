@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:room_to_read/controllers/book_controller.dart';
 import 'package:room_to_read/controllers/checkout_controller.dart';
 import 'package:room_to_read/controllers/student_controller.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
 import 'package:room_to_read/widgets/offline_status_widget.dart';
 
@@ -74,12 +75,14 @@ class CheckoutPage extends GetView<CheckoutController> {
                                 horizontal: 12,
                               ),
                               child: Obx(
-                                () => DropdownButton<String>(
-                                  value: controller.selectedClass.value.isEmpty
-                                      ? null
-                                      : controller.selectedClass.value,
+                                () => DropdownButton<Grade>(
+                                  value: controller.classes.firstWhereOrNull(
+                                    (g) =>
+                                        g.name ==
+                                        controller.selectedClass.value,
+                                  ),
                                   hint: Text(
-                                    'कक्षा चुनें',
+                                    'ग्रेड चुनें',
                                     style: TextStyle(
                                       fontSize: isMobile ? 14 : 15,
                                       color: Colors.grey[600],
@@ -87,11 +90,11 @@ class CheckoutPage extends GetView<CheckoutController> {
                                   ),
                                   isExpanded: true,
                                   underline: const SizedBox(),
-                                  items: controller.classes.map((String value) {
-                                    return DropdownMenuItem<String>(
-                                      value: value,
+                                  items: controller.classes.map((Grade grade) {
+                                    return DropdownMenuItem<Grade>(
+                                      value: grade,
                                       child: Text(
-                                        'कक्षा: $value',
+                                        'ग्रेड: ${grade.name}',
                                         style: TextStyle(
                                           fontSize: isMobile ? 14 : 15,
                                           color: Colors.black,
@@ -99,11 +102,11 @@ class CheckoutPage extends GetView<CheckoutController> {
                                       ),
                                     );
                                   }).toList(),
-                                  onChanged: (String? newValue) {
+                                  onChanged: (Grade? newValue) {
                                     if (newValue != null) {
                                       controller.selectClass(newValue);
                                       studentController.setClassFilter(
-                                        newValue,
+                                        newValue.name,
                                       );
                                     }
                                   },
@@ -186,7 +189,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                     ),
                                   ),
                                   Text(
-                                    'ID: ${student.id} • कक्षा: ${student.className} • रीडिंग लेवल: ${student.readingLevel}',
+                                    'ID: ${student.id} • ग्रेड: ${student.className} • रीडिंग लेवल: ${student.readingLevel}',
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: isMobile ? 12 : 13,
@@ -386,7 +389,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                     SizedBox(width: isMobile ? 10 : 12),
                                     Expanded(
                                       child: Text(
-                                        'पहले कक्षा चुनें',
+                                        'पहले ग्रेड चुनें',
                                         style: TextStyle(
                                           color: Colors.blue[900],
                                           fontSize: isMobile ? 13 : 14,
@@ -440,7 +443,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                 child: Center(
                                   child: Text(
                                     studentController.searchQuery.value.isEmpty
-                                        ? 'इस कक्षा में कोई छात्र नहीं मिला'
+                                        ? 'इस ग्रेड में कोई छात्र नहीं मिला'
                                         : 'कोई छात्र नहीं मिला',
                                     style: TextStyle(
                                       color: Colors.grey[600],
@@ -531,7 +534,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    'ID: ${student.id} • कक्षा: ${student.className}',
+                                                    'ID: ${student.id} • ग्रेड: ${student.className}',
                                                     style: TextStyle(
                                                       color: Colors.grey[600],
                                                       fontSize: isMobile
@@ -1171,7 +1174,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                         height: isMobile ? 12 : 14,
                                       ),
                                       _buildSummaryRow(
-                                        'कक्षा',
+                                        'ग्रेड',
                                         controller.selectedClass.value,
                                         isMobile,
                                       ),

@@ -30,7 +30,7 @@ class Student {
     final prevLevel = int.tryParse(json['M1_TXT1']?.toString() ?? '') ?? 0;
     
     // Use M1_CR for class if available, otherwise use M1_GROUP2N
-    final className = json['M1_CR']?.toString() ?? json['M1_GROUP2N']?.toString() ?? '';
+    final className = json['M1_OPP']?.toString() ?? '';
     
     // Get teacher ID from M1_GROUP2
     final teacherId = json['M1_GROUP2']?.toString() ?? '';

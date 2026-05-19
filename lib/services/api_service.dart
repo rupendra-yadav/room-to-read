@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:get/get.dart';
 import 'dart:convert';
 import 'package:room_to_read/config/api_config.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/services/auth_service.dart';
 import 'package:room_to_read/services/connectivity_service.dart';
 import 'package:room_to_read/services/offline_database_service.dart';
@@ -447,7 +448,7 @@ class ApiService extends GetxService {
         'student_id': studentId, // F4_PARTY1
         'program_id': finalProgramId, // F4_GR
         'school_id': finalSchoolId, // F4_TRP
-        'class': className,
+        'F4_TXT2': className,
         'M1_GROUP': finalSchoolId, // ✅ NEW: School ID as M1_GROUP
         'M1GROUP1': finalProgramId, // ✅ NEW: Program ID as M1GROUP1
       });
@@ -456,7 +457,7 @@ class ApiService extends GetxService {
       print('   F4_LCODE (M1_CODE): $bookId');
       print('   teacher_id: $teacherId');
       print('   student_id: $studentId');
-      print('   class: $className');
+      print('   F4_TXT2: $className');
       print('   program_id: $finalProgramId');
       print('   school_id: $finalSchoolId');
       print('   M1_GROUP: $finalSchoolId');
@@ -611,7 +612,7 @@ class ApiService extends GetxService {
         'student_id': studentId, // F4_PARTY1
         'program_id': finalProgramId, // F4_GR
         'school_id': finalSchoolId, // F4_TRP
-        'class': className, // Class (optional)
+        'F4_TXT2': className, // Class (optional)
         'M1_GROUP': finalSchoolId, // ✅ NEW: School ID as M1_GROUP
         'M1GROUP1': finalProgramId, // ✅ NEW: Program ID as M1GROUP1
       });
@@ -623,7 +624,7 @@ class ApiService extends GetxService {
       print('   teacher_id: $finalTeacherId');
       print('   book_id: $bookId');
       print('   student_id: $studentId');
-      print('   class: $className');
+      print('   F4_TXT2: $className');
       print('   program_id: $finalProgramId');
       print('   school_id: $finalSchoolId');
       print('   M1_GROUP: $finalSchoolId');
@@ -919,7 +920,11 @@ class ApiService extends GetxService {
         body['aggregation'] = aggregation;
       }
 
-      var response = await GetConnect().post(ApiConfig.analyticsUrl, body);
+      var response = await GetConnect().post(
+        ApiConfig.analyticsUrl,
+        body,
+        contentType: 'application/x-www-form-urlencoded',
+      );
 
       if (response.statusCode == 200) {
         var data = response.body;
@@ -1921,5 +1926,44 @@ class ApiService extends GetxService {
     } catch (e) {
       return {'success': false, 'message': 'Error: $e'};
     } finally {}
+  }
+
+  Future<List<Grade>> getGrades() async {
+    try {
+      final response = await GetConnect(
+        timeout: const Duration(seconds: 30),
+      ).post('https://webdevelopercg.com/cico/Api/grade', FormData({}));
+
+      if (response.statusCode == null) return [];
+
+      if (response.statusCode == 200) {
+        var data = response.body;
+
+        if (data is String) {
+          try {
+            data = jsonDecode(data);
+          } catch (e) {
+            print('❌ getGrades: JSON parse error: $e');
+            return [];
+          }
+        }
+
+        if (data is Map &&
+            data['response'] == 'success' &&
+            data['data'] is List) {
+          return (data['data'] as List)
+              .map((e) => Grade.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+
+        return [];
+      } else {
+        print('❌ getGrades: HTTP ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ getGrades: Error - $e');
+      return [];
+    }
   }
 }

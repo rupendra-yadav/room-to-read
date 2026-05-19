@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/services/hybrid_api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
 
@@ -8,11 +9,11 @@ class AnalyticsFilterController extends GetxController {
   final HybridApiService _apiService = Get.find<HybridApiService>();
   final AuthService _authService = Get.find<AuthService>();
 
-  var selectedClass = ''.obs;
+  var selectedGrade = Rx<Grade?>(null);
   var fromDate = ''.obs;
   var toDate = ''.obs;
   var selectedAggregation = 'monthly'.obs;
-  var classes = <String>[].obs;
+  var grades = <Grade>[].obs;
   var isLoading = false.obs;
   final filtersValid = false.obs;
 
@@ -26,12 +27,12 @@ class AnalyticsFilterController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchClasses();
+    fetchGrades();
   }
 
   void _updateFilterValidity() {
     final hasFilter =
-        selectedClass.value.isNotEmpty ||
+        selectedGrade.value != null ||
         fromDate.value.isNotEmpty ||
         toDate.value.isNotEmpty;
 
@@ -54,29 +55,32 @@ class AnalyticsFilterController extends GetxController {
     filtersValid.value = true;
   }
 
-  Future<void> fetchClasses() async {
+  Future<void> fetchGrades() async {
     try {
       isLoading.value = true;
-      print('🏫 Analytics: Fetching classes from API...');
+      print('🏫 Analytics: Fetching grades from API...');
 
-      final classList = await _apiService.getClasses();
+      final gradeList = await _apiService.getGrades();
 
-      if (classList.isNotEmpty) {
-        classes.value = ['सभी कक्षाएं', ...classList];
-        print('✅ Analytics: Classes loaded successfully: $classList');
+      if (gradeList.isNotEmpty) {
+        grades.value = gradeList;
+        print('✅ Analytics: Grades loaded successfully: $gradeList');
       } else {
-        print(
-          '⚠️ Analytics: API returned empty class list, using fallback classes',
+        print('⚠️ Analytics: API returned empty grade list');
+        Get.snackbar(
+          'ग्रेड लोड त्रुटि',
+          'ग्रेड की सूची लोड नहीं हो सकी।',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+          icon: const Icon(Icons.warning, color: Colors.white),
         );
-        _setFallbackClasses();
       }
     } catch (e) {
-      print('❌ Analytics: Error loading classes: $e');
-      _setFallbackClasses();
-
+      print('❌ Analytics: Error loading grades: $e');
       Get.snackbar(
-        'कक्षा लोड त्रुटि',
-        'कक्षाओं की सूची लोड नहीं हो सकी। डिफ़ॉल्ट कक्षाएं दिखाई जा रही हैं।',
+        'ग्रेड लोड त्रुटि',
+        'ग्रेड की सूची लोड नहीं हो सकी।',
         backgroundColor: Colors.orange,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -87,40 +91,9 @@ class AnalyticsFilterController extends GetxController {
     }
   }
 
-  void _setFallbackClasses() {
-    classes.value = [
-      'सभी कक्षाएं',
-      'कक्षा 1',
-      'कक्षा 2',
-      'कक्षा 3',
-      'कक्षा 4',
-      'कक्षा 5',
-      'कक्षा 6',
-      'कक्षा 7',
-      'कक्षा 8',
-      'कक्षा 9',
-      'कक्षा 10',
-    ];
-    print(
-      '📚 Analytics: Using fallback classes: ${classes.length - 1} classes available',
-    );
-  }
-
-  Future<void> refreshClasses() async {
-    print('🔄 Analytics: Manually refreshing classes...');
-    await fetchClasses();
-  }
-
-  bool isUsingFallbackClasses() {
-    return classes.length <= 1 ||
-        (classes.length == 11 &&
-            classes.contains('कक्षा 1') &&
-            classes.contains('कक्षा 10'));
-  }
-
-  void setClass(String className) {
-    selectedClass.value = className == 'सभी कक्षाएं' ? '' : className;
-    print('Selected class: ${selectedClass.value}');
+  void selectGrade(Grade? grade) {
+    selectedGrade.value = grade;
+    print('Selected grade: ${grade?.name}');
     _updateFilterValidity();
   }
 
@@ -198,7 +171,7 @@ class AnalyticsFilterController extends GetxController {
   }
 
   void resetFilters() {
-    selectedClass.value = '';
+    selectedGrade.value = null;
     fromDate.value = '';
     toDate.value = '';
     selectedAggregation.value = 'monthly';
@@ -219,7 +192,7 @@ class AnalyticsFilterController extends GetxController {
     if (!filtersValid.value) {
       Get.snackbar(
         'फ़िल्टर आवश्यक',
-        'कृपया कम से कम एक फ़िल्टर लगाएं (कक्षा या तारीख)',
+        'कृपया कम से कम एक फ़िल्टर लगाएं (ग्रेड या तारीख)',
         backgroundColor: Colors.orange,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -258,7 +231,7 @@ class AnalyticsFilterController extends GetxController {
 
     final filterParams = {
       'teacherId': currentUser.code,
-      'className': selectedClass.value.isEmpty ? null : selectedClass.value,
+      'className': selectedGrade.value?.name,
       'fromDate': fromDate.value.isEmpty ? null : fromDate.value,
       'toDate': toDate.value.isEmpty ? null : toDate.value,
       'aggregation': selectedAggregation.value,
@@ -283,8 +256,8 @@ class AnalyticsFilterController extends GetxController {
   String getFilterSummary() {
     List<String> filters = [];
 
-    if (selectedClass.value.isNotEmpty) {
-      filters.add('कक्षा: ${selectedClass.value}');
+    if (selectedGrade.value != null) {
+      filters.add('ग्रेड: ${selectedGrade.value!.name}');
     }
 
     if (fromDate.value.isNotEmpty || toDate.value.isNotEmpty) {

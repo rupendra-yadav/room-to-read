@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/controllers/analytics_filter_controller.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
 
 class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
@@ -96,7 +97,7 @@ class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'कम से कम एक फ़िल्टर (कक्षा या तारीख) लगाना आवश्यक है',
+                              'कम से कम एक फ़िल्टर (ग्रेड या तारीख) लगाना आवश्यक है',
                               style: TextStyle(
                                 color: Colors.blue[600],
                                 fontSize: isMobile ? 12 : 13,
@@ -126,161 +127,74 @@ class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
                     ),
                     SizedBox(height: isMobile ? 16 : 20),
 
-                    // Class Filter
+                    // Grade Filter
                     _buildFilterSection(
-                      title: 'कक्षा चुनें',
+                      title: 'ग्रेड चुनें',
                       isMobile: isMobile,
-                      child: Column(
-                        children: [
-                          // Fallback warning
-                          Obx(
-                            () => controller.isUsingFallbackClasses()
-                                ? Container(
-                                    padding: EdgeInsets.all(isMobile ? 8 : 10),
-                                    margin: EdgeInsets.only(
-                                      bottom: isMobile ? 8 : 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange[50],
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: Colors.orange[300]!,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.warning_outlined,
-                                          color: Colors.orange[700],
-                                          size: isMobile ? 16 : 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            'डिफ़ॉल्ट कक्षाएं दिखाई जा रही हैं',
-                                            style: TextStyle(
-                                              color: Colors.orange[700],
-                                              fontSize: isMobile ? 11 : 12,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                        GestureDetector(
-                                          onTap: () =>
-                                              controller.refreshClasses(),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.orange[100],
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Icons.refresh,
-                                                  color: Colors.orange[700],
-                                                  size: 14,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'रिफ्रेश',
-                                                  style: TextStyle(
-                                                    color: Colors.orange[700],
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : const SizedBox.shrink(),
+                      child: Obx(
+                        () => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-
-                          // Class dropdown
-                          Obx(
-                            () => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey[300]!),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: controller.isLoading.value
-                                  ? Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: isMobile ? 16 : 18,
+                          child: controller.isLoading.value
+                              ? Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isMobile ? 16 : 18,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              const AlwaysStoppedAnimation<
+                                                Color
+                                              >(Colors.blue),
+                                        ),
                                       ),
-                                      child: Row(
-                                        children: [
-                                          SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  const AlwaysStoppedAnimation<
-                                                    Color
-                                                  >(Colors.blue),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            'कक्षाएं लोड हो रही हैं...',
-                                            style: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: isMobile ? 14 : 15,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : DropdownButton<String>(
-                                      value:
-                                          controller.selectedClass.value.isEmpty
-                                          ? null
-                                          : controller.selectedClass.value,
-                                      hint: Text(
-                                        'सभी कक्षाएं',
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'ग्रेड लोड हो रहे हैं...',
                                         style: TextStyle(
                                           color: Colors.grey[600],
                                           fontSize: isMobile ? 14 : 15,
                                         ),
                                       ),
-                                      isExpanded: true,
-                                      underline: const SizedBox(),
-                                      items: controller.classes.map((
-                                        String value,
-                                      ) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(
-                                            value == 'सभी कक्षाएं'
-                                                ? value
-                                                : 'कक्षा: $value',
-                                            style: TextStyle(
-                                              fontSize: isMobile ? 14 : 15,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: (String? newValue) {
-                                        controller.setClass(newValue ?? '');
-                                      },
+                                    ],
+                                  ),
+                                )
+                              : DropdownButton<Grade>(
+                                  value: controller.selectedGrade.value,
+                                  hint: Text(
+                                    'ग्रेड चुनें',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: isMobile ? 14 : 15,
                                     ),
-                            ),
-                          ),
-                        ],
+                                  ),
+                                  isExpanded: true,
+                                  underline: const SizedBox(),
+                                  items: controller.grades.map((Grade grade) {
+                                    return DropdownMenuItem<Grade>(
+                                      value: grade,
+                                      child: Text(
+                                        'ग्रेड: ${grade.name}',
+                                        style: TextStyle(
+                                          fontSize: isMobile ? 14 : 15,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (Grade? newValue) {
+                                    controller.selectGrade(newValue);
+                                  },
+                                ),
+                        ),
                       ),
                     ),
 
@@ -447,7 +361,9 @@ class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
                               );
                             }).toList(),
                             onChanged: (String? newValue) {
-                              controller.setAggregation(newValue ?? 'monthly');
+                              controller.setAggregation(
+                                newValue ?? 'monthly',
+                              );
                             },
                           ),
                         ),
@@ -463,7 +379,9 @@ class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
                         Obx(
                           () => Container(
                             padding: EdgeInsets.all(isMobile ? 12 : 14),
-                            margin: EdgeInsets.only(bottom: isMobile ? 16 : 20),
+                            margin: EdgeInsets.only(
+                              bottom: isMobile ? 16 : 20,
+                            ),
                             decoration: BoxDecoration(
                               color: controller.filtersValid.value
                                   ? Colors.green[50]
@@ -491,7 +409,7 @@ class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
                                   child: Text(
                                     controller.filtersValid.value
                                         ? 'फ़िल्टर लगाए गए: ${controller.getFilterSummary()}'
-                                        : 'कृपया कम से कम एक फ़िल्टर लगाएं (कक्षा या तारीख)',
+                                        : 'कृपया कम से कम एक फ़िल्टर लगाएं (ग्रेड या तारीख)',
                                     style: TextStyle(
                                       color: controller.filtersValid.value
                                           ? Colors.green[700]

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/controllers/cico_report_controller.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
 import 'package:room_to_read/widgets/shimmer_loading.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:excel/excel.dart' hide Border;
+import 'package:path_provider/path_provider.dart';
 
 class CicoReportPage extends GetView<CicoReportController> {
   const CicoReportPage({Key? key}) : super(key: key);
@@ -37,6 +42,134 @@ class CicoReportPage extends GetView<CicoReportController> {
           formattedDate,
         );
       }
+    }
+  }
+
+  Future<void> _exportToExcel(
+    BuildContext context,
+    List records,
+    bool isMobile,
+  ) async {
+    try {
+      // Show loading snackbar
+      Get.snackbar(
+        'एक्सपोर्ट',
+        'Excel फ़ाइल बन रही है...',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.purple,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+
+      final excel = Excel.createExcel();
+      final Sheet sheet = excel['CICO रिपोर्ट'];
+
+      // Header row style
+      final CellStyle headerStyle = CellStyle(
+        backgroundColorHex: ExcelColor.fromHexString('#6A0DAD'),
+        fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+        bold: true,
+        horizontalAlign: HorizontalAlign.Center,
+      );
+
+      // Define headers
+      final headers = [
+        'क्र.सं.',
+        'छात्र का नाम',
+        'ग्रेड',
+        'पुस्तक का नाम',
+        'पुस्तक आईडी',
+        'स्थिति',
+        'जारी तिथि',
+        'वापसी तिथि',
+        'अपडेट तिथि',
+      ];
+
+      // Write headers
+      for (int i = 0; i < headers.length; i++) {
+        final cell = sheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+        );
+        cell.value = TextCellValue(headers[i]);
+        cell.cellStyle = headerStyle;
+      }
+
+      // Status mapping
+      String _getStatus(String btValue) {
+        switch (btValue) {
+          case '1':
+            return 'जारी';
+          case '2':
+            return 'वापस (सही स्थिति)';
+          case '3':
+            return 'वापस (क्षतिग्रस्त)';
+          case '4':
+            return 'खो गई';
+          default:
+            return 'अज्ञात';
+        }
+      }
+
+      // Write data rows
+      for (int i = 0; i < records.length; i++) {
+        final record = records[i] as Map<String, dynamic>;
+        final btValue = record['F4_BT']?.toString() ?? '1';
+        final rowData = [
+          IntCellValue(i + 1),
+          TextCellValue(record['studentName'] ?? record['F4_PARTY1N'] ?? 'N/A'),
+          TextCellValue(record['className'] ?? record['F4_TXT1'] ?? 'N/A'),
+          TextCellValue(record['bookName'] ?? record['F4_PARTYN'] ?? 'N/A'),
+          TextCellValue(record['F4_PARTY_NO']?.toString() ?? 'N/A'),
+          TextCellValue(_getStatus(btValue)),
+          TextCellValue(record['F4_DATE1'] ?? record['F4_DATE'] ?? 'N/A'),
+          TextCellValue(record['F4_DATE2']?.toString() ?? ''),
+          TextCellValue(record['F4_USERDT']?.toString() ?? ''),
+        ];
+
+        for (int j = 0; j < rowData.length; j++) {
+          final cell = sheet.cell(
+            CellIndex.indexByColumnRow(columnIndex: j, rowIndex: i + 1),
+          );
+          cell.value = rowData[j];
+          // Alternate row background
+          if (i % 2 == 0) {
+            cell.cellStyle = CellStyle(
+              backgroundColorHex: ExcelColor.fromHexString('#F3E5FF'),
+            );
+          }
+        }
+      }
+
+      // Set column widths
+      sheet.setColumnWidth(0, 8);
+      sheet.setColumnWidth(1, 25);
+      sheet.setColumnWidth(2, 15);
+      sheet.setColumnWidth(3, 30);
+      sheet.setColumnWidth(4, 15);
+      sheet.setColumnWidth(5, 22);
+      sheet.setColumnWidth(6, 15);
+      sheet.setColumnWidth(7, 15);
+      sheet.setColumnWidth(8, 15);
+
+      // Save file
+      final bytes = excel.encode()!;
+      final directory = await getTemporaryDirectory();
+      final now = DateTime.now();
+      final fileName =
+          'CICO_Report_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(bytes);
+
+      // Share/save the file
+      await Share.shareXFiles([XFile(file.path)], subject: 'CICO रिपोर्ट');
+    } catch (e) {
+      Get.snackbar(
+        'त्रुटि',
+        'Excel फ़ाइल बनाने में समस्या: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -103,16 +236,18 @@ class CicoReportPage extends GetView<CicoReportController> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Obx(
-                          () => DropdownButton<String>(
-                            value: controller.selectedClass.value,
+                          () => DropdownButton<Grade>(
+                            value: controller.grades.firstWhereOrNull(
+                              (g) => g.name == controller.selectedClass.value,
+                            ),
                             isExpanded: true,
                             underline: const SizedBox(),
-                            hint: const Text('कक्षा चुनें'),
-                            items: controller.classes.map((String value) {
-                              return DropdownMenuItem<String>(
-                                value: value,
+                            hint: const Text('ग्रेड चुनें'),
+                            items: controller.grades.map((Grade grade) {
+                              return DropdownMenuItem<Grade>(
+                                value: grade,
                                 child: Text(
-                                  value,
+                                  'ग्रेड: ${grade.name}',
                                   style: TextStyle(
                                     fontSize: isMobile ? 14 : 15,
                                     color: Colors.black,
@@ -120,7 +255,7 @@ class CicoReportPage extends GetView<CicoReportController> {
                                 ),
                               );
                             }).toList(),
-                            onChanged: (String? newValue) {
+                            onChanged: (Grade? newValue) {
                               if (newValue != null) {
                                 controller.selectClass(newValue);
                               }
@@ -440,7 +575,7 @@ class CicoReportPage extends GetView<CicoReportController> {
                               ),
                               SizedBox(height: 12),
                               Text(
-                                'कक्षा, तिथि या नाम से फ़िल्टर करें',
+                                'ग्रेड, तिथि या नाम से फ़िल्टर करें',
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: isMobile ? 13 : 14,
@@ -462,7 +597,7 @@ class CicoReportPage extends GetView<CicoReportController> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    'CICO रिकॉर्ड (${totalRecords})',
+                                    'CICO रिकॉर्ड ($totalRecords)',
                                     style: TextStyle(
                                       fontSize: isMobile ? 14 : 15,
                                       fontWeight: FontWeight.bold,
@@ -470,6 +605,47 @@ class CicoReportPage extends GetView<CicoReportController> {
                                     ),
                                   ),
                                 ),
+                                // Export to Excel button
+                                GestureDetector(
+                                  onTap: () => _exportToExcel(
+                                    context,
+                                    records,
+                                    isMobile,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: Colors.green[300]!,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.file_download,
+                                          color: Colors.green[700],
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Excel',
+                                          style: TextStyle(
+                                            color: Colors.green[700],
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 // Loading indicator for filtering
                                 Obx(() {
                                   if (controller.isLoading.value) {
@@ -692,7 +868,7 @@ class CicoReportPage extends GetView<CicoReportController> {
                       ),
                     ),
                     Text(
-                      'कक्षा: ${record['className'] ?? record['F4_TXT1'] ?? 'N/A'}',
+                      'ग्रेड: ${record['className'] ?? record['F4_TXT1'] ?? 'N/A'}',
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: isMobile ? 11 : 12,
