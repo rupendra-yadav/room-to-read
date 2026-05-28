@@ -824,7 +824,7 @@ class ApiService extends GetxService {
     try {
       final formData = FormData({
         'teacher_id': teacherId,
-        'class': className ?? '',
+        'grade': className ?? '',
         'from_date': fromDate ?? '',
         'to_date': toDate ?? '',
         'search': '',

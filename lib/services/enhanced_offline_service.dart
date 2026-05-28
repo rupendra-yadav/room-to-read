@@ -590,7 +590,6 @@ class EnhancedOfflineService extends GetxService {
       // Apply class filter
       // if (className != null && className.isNotEmpty) {
       //   filtered = filtered.where((b) {
-      //     // Debug: print all fields to see what's actually stored
       //     print('   🔍 Book fields: ${b.keys.toList()}');
       //     print(
       //       '   F4_TXT2=${b['F4_TXT2']}, F4_TXT1=${b['F4_TXT1']}, className=${b['className']}',
@@ -602,9 +601,11 @@ class EnhancedOfflineService extends GetxService {
       //         b['className']?.toString() ??
       //         b['class']?.toString() ??
       //         '';
+
       //     print(
       //       '   bookClass="$bookClass" vs filter="$className" → match=${bookClass.toLowerCase() == className.toLowerCase()}',
       //     );
+
       //     return bookClass.isEmpty ||
       //         bookClass.toLowerCase() == className.toLowerCase();
       //   }).toList();
@@ -613,54 +614,50 @@ class EnhancedOfflineService extends GetxService {
       // Apply search filter
       if (search != null && search.isNotEmpty) {
         final query = search.toLowerCase();
-        filtered = filtered
-            .where(
-              (b) =>
-                  (b['studentName'] ?? '').toString().toLowerCase().contains(
-                    query,
-                  ) ||
-                  (b['bookName'] ?? '').toString().toLowerCase().contains(
-                    query,
-                  ) ||
-                  (b['bookCode'] ?? '').toString().toLowerCase().contains(
-                    query,
-                  ),
-            )
-            .toList();
+
+        filtered = filtered.where((b) {
+          return (b['studentName'] ?? '').toString().toLowerCase().contains(
+                query,
+              ) ||
+              (b['bookName'] ?? '').toString().toLowerCase().contains(query) ||
+              (b['bookCode'] ?? '').toString().toLowerCase().contains(query);
+        }).toList();
       }
 
-      // Apply date filters
+      // Apply from date filter
       if (fromDate != null && fromDate.isNotEmpty) {
         filtered = filtered.where((b) {
           try {
-            // Try F4_DATE1 first (clean format), then checkoutDate, then F4_DATE
             final rawDate =
                 b['F4_DATE1']?.toString() ??
                 b['checkoutDate']?.toString() ??
                 b['F4_DATE']?.toString() ??
                 '';
+
             if (rawDate.isEmpty) return true;
 
-            // Replace space with T to handle "2026-05-28 00:00:00" format
             final normalized = rawDate.trim().replaceFirst(' ', 'T');
+
             final bookDate = DateTime.tryParse(normalized);
+
             if (bookDate == null) return true;
 
-            // Strip time for date-only comparison
             final bookDay = DateTime(
               bookDate.year,
               bookDate.month,
               bookDate.day,
             );
+
             final fromParsed = DateTime.tryParse(fromDate);
+
             if (fromParsed == null) return true;
+
             final fromDay = DateTime(
               fromParsed.year,
               fromParsed.month,
               fromParsed.day,
             );
 
-            // Include same day (isBefore fromDay means BEFORE the from date, exclude those)
             return !bookDay.isBefore(fromDay);
           } catch (e) {
             return true;
@@ -668,6 +665,7 @@ class EnhancedOfflineService extends GetxService {
         }).toList();
       }
 
+      // Apply to date filter
       if (toDate != null && toDate.isNotEmpty) {
         filtered = filtered.where((b) {
           try {
@@ -676,10 +674,13 @@ class EnhancedOfflineService extends GetxService {
                 b['checkoutDate']?.toString() ??
                 b['F4_DATE']?.toString() ??
                 '';
+
             if (rawDate.isEmpty) return true;
 
             final normalized = rawDate.trim().replaceFirst(' ', 'T');
+
             final bookDate = DateTime.tryParse(normalized);
+
             if (bookDate == null) return true;
 
             final bookDay = DateTime(
@@ -687,11 +688,13 @@ class EnhancedOfflineService extends GetxService {
               bookDate.month,
               bookDate.day,
             );
+
             final toParsed = DateTime.tryParse(toDate);
+
             if (toParsed == null) return true;
+
             final toDay = DateTime(toParsed.year, toParsed.month, toParsed.day);
 
-            // Include same day (isAfter toDay means AFTER the to date, exclude those)
             return !bookDay.isAfter(toDay);
           } catch (e) {
             return true;
@@ -699,39 +702,78 @@ class EnhancedOfflineService extends GetxService {
         }).toList();
       }
 
-      // ✅ NEW: Add API-style field names to all books for UI compatibility
-      // The checkin page expects F4_PARTYN, F4_PARTY1N, etc.
+      // Add API-style field names to all books for UI compatibility
       final booksWithApiFields = filtered.map((book) {
         final bookMap = Map<String, dynamic>.from(book as Map);
 
-        // Add API-style field names if not already present
+        // Decode rawData safely
+        final rawDataString = bookMap['rawData']?.toString();
+
+        Map<String, dynamic> rawData = {};
+
+        if (rawDataString != null && rawDataString.isNotEmpty) {
+          try {
+            rawData = jsonDecode(rawDataString);
+          } catch (_) {}
+        }
+
+        // API compatibility fields
         bookMap['F4_PARTYN'] =
-            bookMap['F4_PARTYN'] ?? bookMap['bookName'] ?? '';
+            bookMap['F4_PARTYN'] ??
+            rawData['F4_PARTYN'] ??
+            bookMap['bookName'] ??
+            '';
+
         bookMap['F4_PARTY1N'] =
-            bookMap['F4_PARTY1N'] ?? bookMap['studentName'] ?? '';
-        bookMap['F4_LCODE'] = bookMap['F4_LCODE'] ?? bookMap['bookCode'] ?? '';
-        bookMap['F4_TXT1'] = bookMap['F4_TXT1'] ?? bookMap['className'] ?? '';
-        bookMap['F4_TXT2'] = (bookMap['F4_TXT2']?.toString() == 'null')
-            ? null
-            : bookMap['F4_TXT2'];
-        bookMap['F4_TXT1'] = (bookMap['F4_TXT1']?.toString() == 'null')
-            ? null
-            : bookMap['F4_TXT1'];
+            bookMap['F4_PARTY1N'] ??
+            rawData['F4_PARTY1N'] ??
+            bookMap['studentName'] ??
+            '';
+
+        bookMap['F4_LCODE'] =
+            bookMap['F4_LCODE'] ??
+            rawData['F4_LCODE'] ??
+            bookMap['bookCode'] ??
+            '';
+
+        // 🔥 FIXED: Restore class/grade fields from rawData
+        bookMap['F4_TXT1'] =
+            bookMap['F4_TXT1'] ??
+            rawData['F4_TXT1'] ??
+            bookMap['className'] ??
+            '';
+
+        bookMap['F4_TXT2'] =
+            bookMap['F4_TXT2'] ??
+            rawData['F4_TXT2'] ??
+            bookMap['className'] ??
+            '';
+
+        // Clean invalid string "null"
+        if (bookMap['F4_TXT1']?.toString() == 'null') {
+          bookMap['F4_TXT1'] = null;
+        }
+
+        if (bookMap['F4_TXT2']?.toString() == 'null') {
+          bookMap['F4_TXT2'] = null;
+        }
 
         return bookMap;
       }).toList();
 
-      // Log results
       print(
         '✅ Enhanced Offline: Successfully found ${booksWithApiFields.length} checked out books (after filters)',
       );
+
       _logSampleBooks(booksWithApiFields);
+
       await _validateCheckedOutBooksData(booksWithApiFields);
 
       return booksWithApiFields;
     } catch (e) {
       print('❌ Error applying filters and validation: $e');
-      return books; // Return unfiltered books if validation fails
+
+      return books;
     }
   }
 
