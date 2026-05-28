@@ -448,7 +448,7 @@ class ApiService extends GetxService {
         'student_id': studentId, // F4_PARTY1
         'program_id': finalProgramId, // F4_GR
         'school_id': finalSchoolId, // F4_TRP
-        'F4_TXT2': className,
+        'grade': className,
         'M1_GROUP': finalSchoolId, // ✅ NEW: School ID as M1_GROUP
         'M1GROUP1': finalProgramId, // ✅ NEW: Program ID as M1GROUP1
       });
@@ -612,7 +612,7 @@ class ApiService extends GetxService {
         'student_id': studentId, // F4_PARTY1
         'program_id': finalProgramId, // F4_GR
         'school_id': finalSchoolId, // F4_TRP
-        'F4_TXT2': className, // Class (optional)
+        'grade': className, // Class (optional)
         'M1_GROUP': finalSchoolId, // ✅ NEW: School ID as M1_GROUP
         'M1GROUP1': finalProgramId, // ✅ NEW: Program ID as M1GROUP1
       });
@@ -713,135 +713,106 @@ class ApiService extends GetxService {
     try {
       print('📡 API: Calling get_issue_book endpoint');
       print('   Teacher ID: $teacherId');
-      print('   Class: ${className ?? "all"}');
+      print('   Class/Grade: ${className ?? "all"}');
       print('   From Date: ${fromDate ?? "none"}');
       print('   To Date: ${toDate ?? "none"}');
       print('   Search: ${search ?? "none"}');
 
-      final body = <String, dynamic>{'teacher_id': teacherId};
+      // ✅ USE FORMDATA (same as Postman)
+      final formData = FormData({'teacher_id': teacherId});
 
-      if (className != null && className.isNotEmpty) {
-        body['class'] = className;
+      // ✅ Grade
+      if (className != null && className.trim().isNotEmpty) {
+        formData.fields.add(MapEntry('grade', className.toString().trim()));
       }
 
-      if (fromDate != null && fromDate.isNotEmpty) {
-        body['from_date'] = fromDate;
+      // ✅ From date
+      if (fromDate != null && fromDate.trim().isNotEmpty) {
+        formData.fields.add(MapEntry('from_date', fromDate.trim()));
       }
 
-      if (toDate != null && toDate.isNotEmpty) {
-        body['to_date'] = toDate;
+      // ✅ To date
+      if (toDate != null && toDate.trim().isNotEmpty) {
+        formData.fields.add(MapEntry('to_date', toDate.trim()));
       }
 
-      if (search != null && search.isNotEmpty) {
-        body['search'] = search;
+      // ✅ Search
+      if (search != null && search.trim().isNotEmpty) {
+        formData.fields.add(MapEntry('search', search.trim()));
       }
 
-      print('📤 API: Request body: $body');
+      // ✅ DEBUG: Print exact fields being sent
+      print('📤 API: Sending FormData fields:');
+      for (final field in formData.fields) {
+        print('   ${field.key}: ${field.value}');
+      }
+
       print('📤 API: URL: ${ApiConfig.checkedOutBooksUrl}');
 
-      var response = await GetConnect(
+      final response = await GetConnect(
         timeout: const Duration(seconds: 30),
-      ).post(ApiConfig.checkedOutBooksUrl, body);
+      ).post(ApiConfig.checkedOutBooksUrl, formData);
 
       print('📥 API: Response status: ${response.statusCode}');
       print('📥 API: Response body type: ${response.body.runtimeType}');
+      print('📥 API: Raw response: ${response.body}');
 
       if (response.statusCode == 200) {
-        var data = response.body;
+        dynamic data = response.body;
 
-        // If data is a string, parse it as JSON
+        // ✅ Parse JSON string
         if (data is String) {
-          print('📥 API: Response is String, parsing JSON...');
+          print('📥 API: Parsing JSON string...');
           try {
             data = jsonDecode(data);
-          } catch (jsonError) {
-            print('❌ API: JSON parse error: $jsonError');
+          } catch (e) {
+            print('❌ JSON Parse Error: $e');
             return [];
           }
         }
 
+        // ✅ Direct list response
         if (data is List) {
-          print('✅ API: Response is List with ${data.length} items');
-          if (data.isNotEmpty) {
-            print('   Sample item: ${data.first}');
-            if (data[0] is Map) {}
-          }
+          print('✅ API returned List with ${data.length} items');
           return data;
-        } else if (data is Map) {
-          print('📥 API: Response is Map');
-          print('   Keys: ${data.keys.toList()}');
-          print('   Response field: ${data['response']}');
-
-          // Handle success response format
-          if (data['response'] == 'success') {
-            print('✅ API: Success response');
-            if (data.containsKey('data')) {
-              final dataValue = data['data'];
-              print('   Data type: ${dataValue.runtimeType}');
-
-              // Check if data is a List
-              if (dataValue is List) {
-                print('✅ API: Data is List with ${dataValue.length} items');
-                if (dataValue.isNotEmpty) {
-                  print('   Sample item: ${dataValue.first}');
-                  if (dataValue[0] is Map) {}
-                }
-                return dataValue;
-              } else if (dataValue is int) {
-                // If data is just a count (like 0 or 1), return empty list
-                print('⚠️ API: Data is int ($dataValue), returning empty list');
-                return [];
-              } else {
-                print(
-                  '⚠️ API: Data is ${dataValue.runtimeType}, returning empty list',
-                );
-                return [];
-              }
-            } else {
-              print('⚠️ API: No data field in response');
-              return [];
-            }
-          } else if (data['response'] == 'error') {
-            final errorMessage = data['message'] ?? 'Unknown error';
-            print('❌ API: Error response: $errorMessage');
-
-            // Check if this is a specific error that we can handle
-            if (errorMessage.contains('Student Already Issued') ||
-                errorMessage.contains('Something Went Wrong')) {
-              // Return empty list for known errors that indicate no data
-              return [];
-            }
-
-            // For other errors, still return empty list but log more details
-            return [];
-          } else if (data.containsKey('data')) {
-            final dataValue = data['data'];
-            print('   Has data field: ${dataValue.runtimeType}');
-
-            if (dataValue is List) {
-              print(
-                '✅ API: Returning ${dataValue.length} items from data field',
-              );
-              return dataValue;
-            }
-          } else {
-            print('⚠️ API: Unknown response format');
-          }
-        } else {
-          print('⚠️ API: Response is ${data.runtimeType}');
         }
 
-        print('⚠️ API: Returning empty list (no valid data found)');
+        // ✅ Map response
+        if (data is Map<String, dynamic>) {
+          print('📥 API Map Keys: ${data.keys.toList()}');
+
+          if (data['response'] == 'success') {
+            final responseData = data['data'];
+
+            if (responseData is List) {
+              print('✅ API Success: ${responseData.length} books received');
+
+              if (responseData.isNotEmpty) {
+                print('📋 Sample Item: ${responseData.first}');
+              }
+
+              return responseData;
+            }
+
+            print('⚠️ Data is not List');
+            return [];
+          }
+
+          print('❌ API Error: ${data['message']}');
+          return [];
+        }
+
+        print('⚠️ Unknown response format');
         return [];
-      } else {
-        print('❌ API: HTTP error ${response.statusCode}');
-        throw Exception(
-          'Failed to load checked out books: ${response.statusCode}',
-        );
       }
-    } catch (e) {
+
+      print('❌ HTTP Error: ${response.statusCode}');
       return [];
-    } finally {}
+    } catch (e, stackTrace) {
+      print('❌ Exception in getCheckedOutBooks: $e');
+      print(stackTrace);
+      return [];
+    }
   }
 
   Future<List<dynamic>> getCicoReport({

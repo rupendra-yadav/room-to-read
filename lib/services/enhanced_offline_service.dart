@@ -359,7 +359,9 @@ class EnhancedOfflineService extends GetxService {
           );
         }
 
-        print('   🔍 Querying for: teacherId = "$teacherId" AND (synced = 0 OR synced = 1)');
+        print(
+          '   🔍 Querying for: teacherId = "$teacherId" AND (synced = 0 OR synced = 1)',
+        );
         checkedOutBooks = await db.query(
           'checked_out_books',
           where: 'teacherId = ? AND (synced = 0 OR synced = 1)',
@@ -372,32 +374,36 @@ class EnhancedOfflineService extends GetxService {
         // ✅ NEW: Filter out books with consumed checkouts
         if (checkedOutBooks.isNotEmpty) {
           print('   🔍 Filtering out consumed checkouts...');
-          
+
           // Get all consumed checkouts
-          final consumedCheckouts = await db.rawQuery(
-            '''
+          final consumedCheckouts = await db.rawQuery('''
             SELECT DISTINCT book_code, student_id FROM offline_transactions_enhanced
             WHERE transaction_type = 'checkout' AND sync_status = 2
-            '''
-          );
-          
+            ''');
+
           final consumedSet = consumedCheckouts
               .map((c) => '${c['book_code']}_${c['student_id']}')
               .toSet();
-          
-          print('      Found ${consumedSet.length} consumed checkouts to exclude');
-          
+
+          print(
+            '      Found ${consumedSet.length} consumed checkouts to exclude',
+          );
+
           // Filter out consumed books
           checkedOutBooks = checkedOutBooks.where((book) {
             final key = '${book['bookCode']}_${book['studentId']}';
             final isConsumed = consumedSet.contains(key);
             if (isConsumed) {
-              print('      ⏭️ Filtering out consumed: ${book['bookCode']} (student: ${book['studentId']})');
+              print(
+                '      ⏭️ Filtering out consumed: ${book['bookCode']} (student: ${book['studentId']})',
+              );
             }
             return !isConsumed;
           }).toList();
-          
-          print('      After filtering: ${checkedOutBooks.length} books remain');
+
+          print(
+            '      After filtering: ${checkedOutBooks.length} books remain',
+          );
         }
 
         if (checkedOutBooks.isNotEmpty) {
@@ -582,15 +588,27 @@ class EnhancedOfflineService extends GetxService {
       var filtered = books;
 
       // Apply class filter
-      if (className != null && className.isNotEmpty) {
-        filtered = filtered
-            .where(
-              (b) =>
-                  (b['className'] ?? '').toString().toLowerCase() ==
-                  className.toLowerCase(),
-            )
-            .toList();
-      }
+      // if (className != null && className.isNotEmpty) {
+      //   filtered = filtered.where((b) {
+      //     // Debug: print all fields to see what's actually stored
+      //     print('   🔍 Book fields: ${b.keys.toList()}');
+      //     print(
+      //       '   F4_TXT2=${b['F4_TXT2']}, F4_TXT1=${b['F4_TXT1']}, className=${b['className']}',
+      //     );
+
+      //     final bookClass =
+      //         b['F4_TXT2']?.toString() ??
+      //         b['F4_TXT1']?.toString() ??
+      //         b['className']?.toString() ??
+      //         b['class']?.toString() ??
+      //         '';
+      //     print(
+      //       '   bookClass="$bookClass" vs filter="$className" → match=${bookClass.toLowerCase() == className.toLowerCase()}',
+      //     );
+      //     return bookClass.isEmpty ||
+      //         bookClass.toLowerCase() == className.toLowerCase();
+      //   }).toList();
+      // }
 
       // Apply search filter
       if (search != null && search.isNotEmpty) {
@@ -612,22 +630,69 @@ class EnhancedOfflineService extends GetxService {
       }
 
       // Apply date filters
-      if (fromDate != null) {
+      if (fromDate != null && fromDate.isNotEmpty) {
         filtered = filtered.where((b) {
           try {
-            final checkoutDate = DateTime.parse(b['checkoutDate'].toString());
-            return checkoutDate.isAfter(DateTime.parse(fromDate));
+            // Try F4_DATE1 first (clean format), then checkoutDate, then F4_DATE
+            final rawDate =
+                b['F4_DATE1']?.toString() ??
+                b['checkoutDate']?.toString() ??
+                b['F4_DATE']?.toString() ??
+                '';
+            if (rawDate.isEmpty) return true;
+
+            // Replace space with T to handle "2026-05-28 00:00:00" format
+            final normalized = rawDate.trim().replaceFirst(' ', 'T');
+            final bookDate = DateTime.tryParse(normalized);
+            if (bookDate == null) return true;
+
+            // Strip time for date-only comparison
+            final bookDay = DateTime(
+              bookDate.year,
+              bookDate.month,
+              bookDate.day,
+            );
+            final fromParsed = DateTime.tryParse(fromDate);
+            if (fromParsed == null) return true;
+            final fromDay = DateTime(
+              fromParsed.year,
+              fromParsed.month,
+              fromParsed.day,
+            );
+
+            // Include same day (isBefore fromDay means BEFORE the from date, exclude those)
+            return !bookDay.isBefore(fromDay);
           } catch (e) {
             return true;
           }
         }).toList();
       }
 
-      if (toDate != null) {
+      if (toDate != null && toDate.isNotEmpty) {
         filtered = filtered.where((b) {
           try {
-            final checkoutDate = DateTime.parse(b['checkoutDate'].toString());
-            return checkoutDate.isBefore(DateTime.parse(toDate));
+            final rawDate =
+                b['F4_DATE1']?.toString() ??
+                b['checkoutDate']?.toString() ??
+                b['F4_DATE']?.toString() ??
+                '';
+            if (rawDate.isEmpty) return true;
+
+            final normalized = rawDate.trim().replaceFirst(' ', 'T');
+            final bookDate = DateTime.tryParse(normalized);
+            if (bookDate == null) return true;
+
+            final bookDay = DateTime(
+              bookDate.year,
+              bookDate.month,
+              bookDate.day,
+            );
+            final toParsed = DateTime.tryParse(toDate);
+            if (toParsed == null) return true;
+            final toDay = DateTime(toParsed.year, toParsed.month, toParsed.day);
+
+            // Include same day (isAfter toDay means AFTER the to date, exclude those)
+            return !bookDay.isAfter(toDay);
           } catch (e) {
             return true;
           }
@@ -646,6 +711,12 @@ class EnhancedOfflineService extends GetxService {
             bookMap['F4_PARTY1N'] ?? bookMap['studentName'] ?? '';
         bookMap['F4_LCODE'] = bookMap['F4_LCODE'] ?? bookMap['bookCode'] ?? '';
         bookMap['F4_TXT1'] = bookMap['F4_TXT1'] ?? bookMap['className'] ?? '';
+        bookMap['F4_TXT2'] = (bookMap['F4_TXT2']?.toString() == 'null')
+            ? null
+            : bookMap['F4_TXT2'];
+        bookMap['F4_TXT1'] = (bookMap['F4_TXT1']?.toString() == 'null')
+            ? null
+            : bookMap['F4_TXT1'];
 
         return bookMap;
       }).toList();
@@ -783,17 +854,24 @@ class EnhancedOfflineService extends GetxService {
         [teacherId],
       );
       final checkedInBookStudents = pendingCheckins
-          .map((c) => {
-            'book_code': (c['book_code'] ?? '').toString().trim(),
-            'student_id': (c['student_id'] ?? '').toString().trim(),
-          })
-          .where((item) => item['book_code']!.isNotEmpty && item['student_id']!.isNotEmpty)
+          .map(
+            (c) => {
+              'book_code': (c['book_code'] ?? '').toString().trim(),
+              'student_id': (c['student_id'] ?? '').toString().trim(),
+            },
+          )
+          .where(
+            (item) =>
+                item['book_code']!.isNotEmpty && item['student_id']!.isNotEmpty,
+          )
           .toSet();
       print(
         '   Found ${checkedInBookStudents.length} book-student pairs with checkins (pending or synced, to exclude)',
       );
       for (final item in checkedInBookStudents) {
-        print('      - Book: ${item['book_code']}, Student: ${item['student_id']}');
+        print(
+          '      - Book: ${item['book_code']}, Student: ${item['student_id']}',
+        );
       }
 
       // Look for pending checkout transactions in ENHANCED table
@@ -812,13 +890,17 @@ class EnhancedOfflineService extends GetxService {
       enhancedTransactions = enhancedTransactions.where((t) {
         final checkoutCode = (t['book_code'] ?? '').toString().trim();
         final checkoutStudentId = (t['student_id'] ?? '').toString().trim();
-        
-        final isCheckedIn = checkedInBookStudents.any((item) =>
-            item['book_code'] == checkoutCode && 
-            item['student_id'] == checkoutStudentId);
-        
+
+        final isCheckedIn = checkedInBookStudents.any(
+          (item) =>
+              item['book_code'] == checkoutCode &&
+              item['student_id'] == checkoutStudentId,
+        );
+
         if (isCheckedIn && checkoutCode.isNotEmpty) {
-          print('   ⏭️ Filtering out checked-in book: code="$checkoutCode", student="$checkoutStudentId"');
+          print(
+            '   ⏭️ Filtering out checked-in book: code="$checkoutCode", student="$checkoutStudentId"',
+          );
         }
         return !isCheckedIn;
       }).toList();

@@ -6,6 +6,7 @@ import 'package:room_to_read/services/connectivity_service.dart';
 import 'package:room_to_read/services/hybrid_api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
 import 'package:room_to_read/services/offline_database_service.dart';
+import 'package:room_to_read/models/grade_model.dart';
 
 class StudentController extends GetxController {
   late HybridApiService apiService;
@@ -16,7 +17,7 @@ class StudentController extends GetxController {
   var searchQuery = ''.obs;
   var selectedStudent = Rxn<Student>();
   var filterType = 'सभी'.obs;
-  var classes = <String>[].obs;
+  var grades = <Grade>[].obs;
   var isLoading = false.obs;
 
   @override
@@ -37,9 +38,8 @@ class StudentController extends GetxController {
       print('Loading students for teacher ID: $teacherId');
 
       // Fetch classes
-      final classList = await apiService.getClasses();
-      print('Classes loaded: $classList');
-      classes.value = classList;
+      final gradeList = await apiService.getGrades();
+      grades.value = gradeList;
 
       // Fetch all students using hybrid service
       final allStudents = await apiService.getStudents(group1: teacherId);
@@ -210,9 +210,11 @@ class StudentController extends GetxController {
     if (searchQuery.value.isNotEmpty) {
       final query = searchQuery.value.toLowerCase().trim();
       print('   🔎 All 57 grade-filtered names:');
-  for (final s in result) {
-    print('     "${s.name}" | trimmed: "${s.name.trim()}" | lower: "${s.name.toLowerCase().trim()}" | contains aa: ${s.name.toLowerCase().trim().contains("aa")}');
-  }
+      for (final s in result) {
+        print(
+          '     "${s.name}" | trimmed: "${s.name.trim()}" | lower: "${s.name.toLowerCase().trim()}" | contains aa: ${s.name.toLowerCase().trim().contains("aa")}',
+        );
+      }
       result = result
           .where(
             (student) =>

@@ -137,43 +137,38 @@ class CheckinPage extends GetView<CheckinController> {
                                         horizontal: 12,
                                       ),
                                       child: Obx(
-                                        () =>
-                                            DropdownButton<Grade>(
-                                              value: controller.classes
-                                                  .firstWhereOrNull(
-                                                    (g) =>
-                                                        g.name ==
-                                                        controller
-                                                            .selectedClass
-                                                            .value,
-                                                  ),
-                                              isExpanded: true,
-                                              underline: const SizedBox(),
-                                              hint: const Text('ग्रेड चुनें'),
-                                              items: controller.classes.map((
-                                                Grade grade,
-                                              ) {
-                                                return DropdownMenuItem<Grade>(
-                                                  value: grade,
-                                                  child: Text(
-                                                    'ग्रेड: ${grade.name}',
-                                                    style: TextStyle(
-                                                      fontSize: isMobile
-                                                          ? 14
-                                                          : 15,
-                                                      color: Colors.black,
-                                                    ),
-                                                  ),
-                                                );
-                                              }).toList(),
-                                              onChanged: (Grade? newValue) {
-                                                if (newValue != null) {
-                                                  controller.selectClass(
-                                                    newValue,
-                                                  );
-                                                }
-                                              },
-                                            ),
+                                        () => DropdownButton<Grade>(
+                                          value: controller.classes
+                                              .firstWhereOrNull(
+                                                (g) =>
+                                                    g.name ==
+                                                    controller
+                                                        .selectedClass
+                                                        .value,
+                                              ),
+                                          isExpanded: true,
+                                          underline: const SizedBox(),
+                                          hint: const Text('ग्रेड चुनें'),
+                                          items: controller.classes.map((
+                                            Grade grade,
+                                          ) {
+                                            return DropdownMenuItem<Grade>(
+                                              value: grade,
+                                              child: Text(
+                                                'ग्रेड: ${grade.name}',
+                                                style: TextStyle(
+                                                  fontSize: isMobile ? 14 : 15,
+                                                  color: Colors.black,
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (Grade? newValue) {
+                                            if (newValue != null) {
+                                              controller.selectClass(newValue);
+                                            }
+                                          },
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -440,6 +435,56 @@ class CheckinPage extends GetView<CheckinController> {
                                 ),
                               ],
                             ),
+
+                            // After the two date picker rows, add:
+                            Obx(
+                              () =>
+                                  (controller.dateFromFilter.value.isNotEmpty ||
+                                      controller.dateToFilter.value.isNotEmpty)
+                                  ? Padding(
+                                      padding: EdgeInsets.only(top: 8),
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          controller.setDateFilter('', '');
+                                        },
+                                        child: Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange[50],
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.orange[200]!,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.clear,
+                                                color: Colors.orange[700],
+                                                size: 16,
+                                              ),
+                                              SizedBox(width: 6),
+                                              Text(
+                                                'तिथि फिल्टर हटाएं',
+                                                style: TextStyle(
+                                                  color: Colors.orange[700],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : SizedBox.shrink(),
+                            ),
+
                             SizedBox(height: isMobile ? 16 : 20),
                             // Search
                             Container(
@@ -476,11 +521,10 @@ class CheckinPage extends GetView<CheckinController> {
                             Obx(() {
                               // Use filteredRecords if search or class filter is active
                               // Otherwise use all checkedOutBooks
-                              List<Map<String, dynamic>> records =
-                                  (controller.searchQuery.value.isNotEmpty ||
-                                      controller.selectedClass.value != null)
-                                  ? controller.filteredRecords.toList()
-                                  : controller.checkedOutBooks.toList();
+                              // AFTER
+                              List<Map<String, dynamic>> records = controller
+                                  .filteredRecords
+                                  .toList();
 
                               // Filter out records with completely empty data
                               // Only exclude if BOTH student name AND book code are missing
@@ -699,12 +743,13 @@ class CheckinPage extends GetView<CheckinController> {
                                               defaultValue: 'Unknown Student',
                                             );
 
-                                            final className = getFieldValue(
-                                              record,
-                                              rawData,
-                                              ['F4_TXT1', 'className', 'class'],
-                                              defaultValue: 'N/A',
-                                            );
+                                            final className =
+                                                getFieldValue(record, rawData, [
+                                                  'F4_TXT2',
+                                                  'F4_TXT1',
+                                                  'className',
+                                                  'class',
+                                                ], defaultValue: 'N/A');
 
                                             // Book name extraction
                                             final bookName = getFieldValue(
@@ -878,8 +923,8 @@ class CheckinPage extends GetView<CheckinController> {
         rawData?['student_name'] ??
         'N/A';
     final className =
-        record['F4_TXT1'] ??
-        rawData?['F4_TXT1'] ??
+        record['F4_TXT2'] ??
+        rawData?['F4_TXT2'] ??
         record['className'] ??
         rawData?['class'] ??
         'N/A';
@@ -1034,7 +1079,7 @@ class CheckinPage extends GetView<CheckinController> {
                               ),
                             ),
                             Text(
-                              'कक्षा: $className',
+                              'ग्रेड: $className',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: isMobile ? 11 : 12,

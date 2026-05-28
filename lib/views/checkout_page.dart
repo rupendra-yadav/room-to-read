@@ -762,11 +762,16 @@ class CheckoutPage extends GetView<CheckoutController> {
                                         }
 
                                         // Only allow selection if book is available
+                                        // Only allow selection if book is available
                                         if (book.availableCopies > 0) {
                                           print(
                                             '✅ Selecting book: ${book.title}',
                                           );
                                           controller.selectBook(book);
+                                          // Clear search field and close results dropdown
+                                          controller.bookSearchController
+                                              .clear();
+                                          bookController.searchBooks('');
                                         } else {
                                           print(
                                             '❌ Book not available: ${book.availableCopies} copies',

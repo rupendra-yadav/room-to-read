@@ -7,8 +7,22 @@ import 'package:room_to_read/widgets/shimmer_loading.dart';
 import 'package:room_to_read/widgets/debug_info_widget.dart';
 import 'package:room_to_read/widgets/offline_status_widget.dart';
 
-class BooksListPage extends GetView<BookController> {
+class BooksListPage extends StatefulWidget {
   const BooksListPage({Key? key}) : super(key: key);
+
+  @override
+  State<BooksListPage> createState() => _BooksListPageState();
+}
+
+class _BooksListPageState extends State<BooksListPage> {
+  final BookController controller = Get.find<BookController>();
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +35,7 @@ class BooksListPage extends GetView<BookController> {
       appBar: CustomAppBar(title: 'Room To Read'),
       body: Obx(() {
         if (controller.isLoading.value) {
+          _searchController.text = controller.searchQuery.value;
           return ListView.builder(
             itemCount: 5,
             itemBuilder: (context, index) => const StudentCardShimmer(),
@@ -84,6 +99,7 @@ class BooksListPage extends GetView<BookController> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: TextField(
+                      controller: _searchController,
                       onChanged: (value) => controller.searchBooks(value),
                       decoration: InputDecoration(
                         hintText: 'किताब का नाम या लेखक खोजें',
@@ -124,7 +140,7 @@ class BooksListPage extends GetView<BookController> {
                       ),
                     ),
                   ),
-                  // Add refresh button
+                  // Refresh button
                   IconButton(
                     onPressed: () => controller.loadBooks(),
                     icon: Obx(
@@ -228,7 +244,6 @@ class BooksListPage extends GetView<BookController> {
   }
 
   Widget _buildBookCard(dynamic book, bool isMobile, double spacing) {
-    // Simple logic: Green if available, Red if not
     final bool isAvailable = book.availableCopy > 0;
     final Color statusColor = isAvailable ? Colors.green : Colors.red;
     final Color statusBgColor = isAvailable
@@ -265,7 +280,6 @@ class BooksListPage extends GetView<BookController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Primary name (book_name / Hindi)
                   Text(
                     book.bookName,
                     style: TextStyle(
@@ -276,7 +290,6 @@ class BooksListPage extends GetView<BookController> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  // Roman name
                   if (book.bookRomanName != null &&
                       book.bookRomanName.toString().isNotEmpty)
                     Text(
@@ -289,7 +302,6 @@ class BooksListPage extends GetView<BookController> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  // Local name — only show if different from bookName to avoid duplication
                   if (book.bookLocalName != null &&
                       book.bookLocalName.toString().isNotEmpty &&
                       book.bookLocalName.toString() != book.bookName.toString())
@@ -303,7 +315,6 @@ class BooksListPage extends GetView<BookController> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   SizedBox(height: isMobile ? 4 : 6),
-                  // Author
                   Text(
                     book.authorName,
                     style: TextStyle(
@@ -314,7 +325,6 @@ class BooksListPage extends GetView<BookController> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: isMobile ? 4 : 6),
-                  // Availability badge
                   Row(
                     children: [
                       Container(

@@ -117,7 +117,7 @@ class CicoReportPage extends GetView<CicoReportController> {
         final rowData = [
           IntCellValue(i + 1),
           TextCellValue(record['studentName'] ?? record['F4_PARTY1N'] ?? 'N/A'),
-          TextCellValue(record['className'] ?? record['F4_TXT1'] ?? 'N/A'),
+          TextCellValue(record['className'] ?? record['F4_TXT2'] ?? 'N/A'),
           TextCellValue(record['bookName'] ?? record['F4_PARTYN'] ?? 'N/A'),
           TextCellValue(record['F4_PARTY_NO']?.toString() ?? 'N/A'),
           TextCellValue(_getStatus(btValue)),
@@ -868,7 +868,7 @@ class CicoReportPage extends GetView<CicoReportController> {
                       ),
                     ),
                     Text(
-                      'ग्रेड: ${record['className'] ?? record['F4_TXT1'] ?? 'N/A'}',
+                      'ग्रेड: ${record['className'] ?? record['F4_TXT2'] ?? 'N/A'}',
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: isMobile ? 11 : 12,

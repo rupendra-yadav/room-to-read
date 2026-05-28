@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/controllers/home_controller.dart';
@@ -170,14 +171,24 @@ class CheckinController extends GetxController {
 
   Future<void> fetchCheckedOutBooks() async {
     try {
-      isLoading.value = true;
-
-      final user = _authService.currentUser.value;
-      if (user == null) {
+      // ✅ Don't fetch if no date filter is set
+      if (dateFromFilter.value.isEmpty && dateToFilter.value.isEmpty) {
+        checkedOutBooks.clear();
+        filteredRecords.clear();
         return;
       }
 
-      final data = await apiService.getCheckedOutBooks(teacherId: user.code);
+      isLoading.value = true;
+      final user = _authService.currentUser.value;
+      if (user == null) return;
+
+      // Pass date filters to the API call
+      final data = await apiService.getCheckedOutBooks(
+        teacherId: user.code,
+        className: selectedClass.value,
+        fromDate: dateFromFilter.value.isNotEmpty ? dateFromFilter.value : null,
+        toDate: dateToFilter.value.isNotEmpty ? dateToFilter.value : null,
+      );
       if (data.isNotEmpty) {
         // Log all books returned
         for (int i = 0; i < data.length; i++) {
@@ -410,6 +421,8 @@ class CheckinController extends GetxController {
           record['bookName']?.toString() ??
           '';
       final className =
+          rawData?['F4_TXT2']?.toString() ??
+          record['F4_TXT2']?.toString() ??
           rawData?['F4_TXT1']?.toString() ??
           record['F4_TXT1']?.toString() ??
           record['className']?.toString() ??
@@ -1029,51 +1042,62 @@ class CheckinController extends GetxController {
     fetchCheckedOutBooks();
   }
 
-  /// ✅ Apply all filters (class + search)
   void _applyFilters() {
     List<Map<String, dynamic>> filtered = checkedOutBooks.toList();
 
-    // Apply class filter
-    if (selectedClass.value != null && selectedClass.value!.isNotEmpty) {
-      filtered = filtered.where((book) {
-        final bookClass =
-            book['F4_TXT1']?.toString() ?? book['className']?.toString() ?? '';
-        return bookClass == selectedClass.value;
-      }).toList();
-    }
+    // ✅ REMOVED class filter — API already filters by grade
+    // Local DB stores F4_TXT2 as "null" string causing false negatives
 
-    // Apply date range filter
+    // Date filter stays — API filters too but local DB date fields are reliable
     if (dateFromFilter.value.isNotEmpty || dateToFilter.value.isNotEmpty) {
       filtered = filtered.where((book) {
         final rawDate =
             book['F4_DATE1']?.toString() ?? book['F4_DATE']?.toString() ?? '';
         if (rawDate.isEmpty) return true;
-
-        final bookDate = DateTime.tryParse(rawDate);
+        final normalized = rawDate.trim().replaceFirst(' ', 'T');
+        final bookDate = DateTime.tryParse(normalized);
         if (bookDate == null) return true;
+        final bookDay = DateTime(bookDate.year, bookDate.month, bookDate.day);
 
         if (dateFromFilter.value.isNotEmpty) {
-          final from = DateTime.tryParse(dateFromFilter.value);
-          if (from != null && bookDate.isBefore(from)) return false;
+          final fromParsed = DateTime.tryParse(dateFromFilter.value);
+          if (fromParsed != null) {
+            final fromDay = DateTime(
+              fromParsed.year,
+              fromParsed.month,
+              fromParsed.day,
+            );
+            if (bookDay.isBefore(fromDay)) return false;
+          }
         }
-
         if (dateToFilter.value.isNotEmpty) {
-          final to = DateTime.tryParse(dateToFilter.value);
-          if (to != null && bookDate.isAfter(to)) return false;
+          final toParsed = DateTime.tryParse(dateToFilter.value);
+          if (toParsed != null) {
+            final toDay = DateTime(toParsed.year, toParsed.month, toParsed.day);
+            if (bookDay.isAfter(toDay)) return false;
+          }
         }
-
         return true;
       }).toList();
     }
 
-    // Apply search filter
+    // Search filter
     if (searchQuery.value.isNotEmpty) {
-      final q = searchQuery.value.toLowerCase();
+      final q = searchQuery.value.toLowerCase().trim();
       filtered = filtered.where((r) {
-        return (r['F4_PARTY1N'] ?? '').toString().toLowerCase().contains(q) ||
-            (r['F4_PARTYN'] ?? '').toString().toLowerCase().contains(q) ||
-            (r['F4_LCODE'] ?? '').toString().toLowerCase().contains(q) ||
-            (r['F4_TXT1'] ?? '').toString().toLowerCase().contains(q);
+        final studentName =
+            (r['F4_PARTY1N'] ?? r['studentName'] ?? r['M1_NAME'] ?? '')
+                .toString()
+                .toLowerCase();
+        final bookName = (r['F4_PARTYN'] ?? r['bookName'] ?? '')
+            .toString()
+            .toLowerCase();
+        final bookCode = (r['F4_LCODE'] ?? r['bookCode'] ?? '')
+            .toString()
+            .toLowerCase();
+        return studentName.contains(q) ||
+            bookName.contains(q) ||
+            bookCode.contains(q);
       }).toList();
     }
 
@@ -1087,6 +1111,8 @@ class CheckinController extends GetxController {
     filteredRecords.clear();
     dateFromFilter.value = ''; // Reset date filters too
     dateToFilter.value = '';
+    checkedOutBooks.clear();
+    filteredRecords.clear();
   }
 
   void selectRecordByData(Map<String, dynamic> record) {
@@ -1100,26 +1126,29 @@ class CheckinController extends GetxController {
 
   void searchRecords(String query) {
     search(query); // Delegate to existing search method
+    // _applyFilters();
   }
 
   Future<void> refreshCheckedOutBooks() async {
-    // Clear current data to force fresh fetch
     checkedOutBooks.clear();
     filteredRecords.clear();
     searchQuery.value = '';
-
-    // Fetch fresh data
+    // dateFromFilter and dateToFilter intentionally NOT cleared here
+    // so refresh re-fetches with the same date range the user set
     await fetchCheckedOutBooks();
-
-    // Force UI update
     checkedOutBooks.refresh();
   }
 
   void setDateFilter(String from, String to) {
     dateFromFilter.value = from;
     dateToFilter.value = to;
-    // Only re-filter existing data, don't re-fetch (which would lose class context)
-    _applyFilters();
+    // Only fetch if at least one date is set, otherwise clear
+    if (from.isEmpty && to.isEmpty) {
+      checkedOutBooks.clear();
+      filteredRecords.clear();
+    } else {
+      fetchCheckedOutBooks();
+    }
   }
 
   // Fetch classes method

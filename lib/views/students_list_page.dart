@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/controllers/student_controller.dart';
+import 'package:room_to_read/models/grade_model.dart';
 import 'package:room_to_read/models/student_model.dart';
 import 'package:room_to_read/views/student_detail_page.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
 import 'package:room_to_read/widgets/shimmer_loading.dart';
-
 
 class StudentsListPage extends GetView<StudentController> {
   const StudentsListPage({Key? key}) : super(key: key);
@@ -89,20 +89,30 @@ class StudentsListPage extends GetView<StudentController> {
                           value: controller.filterType.value,
                           isExpanded: true,
                           underline: const SizedBox(),
-                          items: ['सभी', ...controller.classes].map((
-                            String value,
-                          ) {
-                            return DropdownMenuItem<String>(
-                              value: value,
+                          items: [
+                            DropdownMenuItem<String>(
+                              value: 'सभी',
                               child: Text(
-                                value,
+                                'सभी',
                                 style: TextStyle(
                                   fontSize: isMobile ? 14 : 15,
                                   color: Colors.black,
                                 ),
                               ),
-                            );
-                          }).toList(),
+                            ),
+                            ...controller.grades.map((Grade grade) {
+                              return DropdownMenuItem<String>(
+                                value: grade.name, // filter by grade.name
+                                child: Text(
+                                  'ग्रेड: ${grade.name}',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 14 : 15,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
                           onChanged: (String? newValue) {
                             if (newValue != null) {
                               controller.setFilterType(newValue);
@@ -151,84 +161,82 @@ class StudentsListPage extends GetView<StudentController> {
             ),
             // Students List
             Expanded(
-              child: Obx(
-                () {
-                  final studentCount = controller.filteredStudents.length;
-                  return Column(
-                    children: [
-                      // Student count header
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: horizontalPadding,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'कुल छात्र: $studentCount',
-                              style: TextStyle(
-                                fontSize: isMobile ? 14 : 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[700],
+              child: Obx(() {
+                final studentCount = controller.filteredStudents.length;
+                return Column(
+                  children: [
+                    // Student count header
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'कुल छात्र: $studentCount',
+                            style: TextStyle(
+                              fontSize: isMobile ? 14 : 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          if (controller.filterType.value != 'सभी')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.amber[100],
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.amber[300]!),
+                              ),
+                              child: Text(
+                                controller.filterType.value,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 12 : 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber[900],
+                                ),
                               ),
                             ),
-                            if (controller.filterType.value != 'सभी')
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber[100],
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.amber[300]!),
-                                ),
-                                child: Text(
-                                  controller.filterType.value,
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 12 : 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber[900],
-                                  ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 8 : 10),
+                    // Students list
+                    Expanded(
+                      child: studentCount == 0
+                          ? Center(
+                              child: Text(
+                                'कोई छात्र नहीं मिला',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: isMobile ? 14 : 16,
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: isMobile ? 8 : 10),
-                      // Students list
-                      Expanded(
-                        child: studentCount == 0
-                            ? Center(
-                                child: Text(
-                                  'कोई छात्र नहीं मिला',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: isMobile ? 14 : 16,
-                                  ),
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: horizontalPadding,
-                                  vertical: verticalPadding,
-                                ),
-                                itemCount: studentCount,
-                                itemBuilder: (context, index) {
-                                  final student =
-                                      controller.filteredStudents[index];
-                                  return _buildStudentCard(
-                                    student,
-                                    isMobile,
-                                    verticalPadding,
-                                  );
-                                },
+                            )
+                          : ListView.builder(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPadding,
+                                vertical: verticalPadding,
                               ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                              itemCount: studentCount,
+                              itemBuilder: (context, index) {
+                                final student =
+                                    controller.filteredStudents[index];
+                                return _buildStudentCard(
+                                  student,
+                                  isMobile,
+                                  verticalPadding,
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              }),
             ),
           ],
         );
@@ -282,7 +290,7 @@ class StudentsListPage extends GetView<StudentController> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'कक्षा: ${student.className} • ID: ${student.id}',
+                    'ग्रेड: ${student.className} • ID: ${student.id}',
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: isMobile ? 12 : 13,

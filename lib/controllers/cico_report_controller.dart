@@ -54,8 +54,8 @@ class CicoReportController extends GetxController {
 
       // Fetch classes
       print('📚 Fetching classes...');
-     final gradeList = await apiService.getGrades();
-grades.value = gradeList;
+      final gradeList = await apiService.getGrades();
+      grades.value = gradeList;
 
       // Fetch CICO report initially
       print('📊 Fetching initial CICO report...');
@@ -279,7 +279,7 @@ grades.value = gradeList;
                     .contains(lowerQuery) ||
                 // Search by class
                 ((record['className'] ??
-                            record['F4_TXT1'] ??
+                            record['F4_TXT2'] ??
                             record['class'] ??
                             '')
                         as String)
