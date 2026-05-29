@@ -902,12 +902,16 @@ class HybridApiService extends GetxService {
         final books = await getCheckedOutBooks(teacherId: teacherId);
         return books.length;
       } else {
-        final books = await _offlineDb.getCheckedOutBooksOffline(
+        // ✅ FIX: Use EnhancedOfflineService which includes BOTH
+        // synced API books (checked_out_books) AND pending offline
+        // transactions (offline_transactions_enhanced, synced=0)
+        final books = await _enhancedOfflineService.getCheckedOutBooks(
           teacherId: teacherId,
         );
         return books.length;
       }
     } catch (e) {
+      print('❌ Error getting book issue count: $e');
       return 0;
     }
   }
