@@ -141,24 +141,24 @@ class _BooksListPageState extends State<BooksListPage> {
                     ),
                   ),
                   // Refresh button
-                  IconButton(
-                    onPressed: () => controller.loadBooks(),
-                    icon: Obx(
-                      () => controller.isLoading.value
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.orange,
-                                ),
-                              ),
-                            )
-                          : Icon(Icons.refresh, color: Colors.orange, size: 24),
-                    ),
-                    tooltip: 'रीफ्रेश करें',
-                  ),
+                  // IconButton(
+                  //   onPressed: () => controller.loadBooks(),
+                  //   icon: Obx(
+                  //     () => controller.isLoading.value
+                  //         ? SizedBox(
+                  //             width: 20,
+                  //             height: 20,
+                  //             child: CircularProgressIndicator(
+                  //               strokeWidth: 2,
+                  //               valueColor: AlwaysStoppedAnimation<Color>(
+                  //                 Colors.orange,
+                  //               ),
+                  //             ),
+                  //           )
+                  //         : Icon(Icons.refresh, color: Colors.orange, size: 24),
+                  //   ),
+                  //   tooltip: 'रीफ्रेश करें',
+                  // ),
                 ],
               ),
             ),

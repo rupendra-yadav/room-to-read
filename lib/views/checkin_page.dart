@@ -584,43 +584,43 @@ class CheckinPage extends GetView<CheckinController> {
                                       // Debug info
                                       SizedBox(width: 8),
                                       // Refresh button
-                                      GestureDetector(
-                                        onTap: () async {
-                                          await controller
-                                              .refreshCheckedOutBooks();
-                                        },
-                                        child: Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green[50],
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.green[200]!,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.refresh,
-                                                color: Colors.green[700],
-                                                size: 16,
-                                              ),
-                                              SizedBox(width: 4),
-                                              Text(
-                                                'रिफ्रेश',
-                                                style: TextStyle(
-                                                  color: Colors.green[700],
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
+                                      // GestureDetector(
+                                      //   onTap: () async {
+                                      //     await controller
+                                      //         .refreshCheckedOutBooks();
+                                      //   },
+                                      //   child: Container(
+                                      //     padding: EdgeInsets.all(8),
+                                      //     decoration: BoxDecoration(
+                                      //       color: Colors.green[50],
+                                      //       borderRadius: BorderRadius.circular(
+                                      //         6,
+                                      //       ),
+                                      //       border: Border.all(
+                                      //         color: Colors.green[200]!,
+                                      //       ),
+                                      //     ),
+                                      //     child: Row(
+                                      //       mainAxisSize: MainAxisSize.min,
+                                      //       children: [
+                                      //         Icon(
+                                      //           Icons.refresh,
+                                      //           color: Colors.green[700],
+                                      //           size: 16,
+                                      //         ),
+                                      //         SizedBox(width: 4),
+                                      //         Text(
+                                      //           'रिफ्रेश',
+                                      //           style: TextStyle(
+                                      //             color: Colors.green[700],
+                                      //             fontSize: 12,
+                                      //             fontWeight: FontWeight.w500,
+                                      //           ),
+                                      //         ),
+                                      //       ],
+                                      //     ),
+                                      //   ),
+                                      // ),
                                     ],
                                   ),
                                   SizedBox(height: isMobile ? 10 : 12),

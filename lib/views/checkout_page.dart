@@ -1208,7 +1208,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                       ),
                                       _buildSummaryRow(
                                         'शीर्ष प्रतियां',
-                                        '${book.availableCopies - 1}',
+                                        '${book.availableCopies }',
                                         isMobile,
                                       ),
                                     ],
