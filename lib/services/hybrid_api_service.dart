@@ -7,6 +7,7 @@ import 'package:room_to_read/services/auth_service.dart';
 import 'package:room_to_read/services/connectivity_service.dart';
 import 'package:room_to_read/services/offline_database_service.dart';
 import 'package:room_to_read/services/enhanced_offline_service.dart';
+import 'package:sqflite/sqflite.dart';
 
 class HybridApiService extends GetxService {
   final ApiService _apiService = Get.find<ApiService>();
@@ -1141,7 +1142,7 @@ class HybridApiService extends GetxService {
           'code': grade.code,
           'name': grade.name,
           'cached_at': DateTime.now().toIso8601String(),
-        });
+        }, conflictAlgorithm: ConflictAlgorithm.replace); // ✅
       }
       await batch.commit(noResult: true);
       print('💾 Cached ${grades.length} grades offline');
@@ -1153,15 +1154,9 @@ class HybridApiService extends GetxService {
   Future<List<Grade>> _getGradesOffline() async {
     try {
       final db = await _offlineDb.database;
-      final rows = await db.query(
-        'grades_cache',
-        orderBy: 'CAST(name AS INTEGER) ASC',
+      final rows = await db.rawQuery(
+        'SELECT DISTINCT code, name FROM grades_cache ORDER BY CAST(name AS INTEGER) ASC', // ✅
       );
-      if (rows.isEmpty) {
-        print('⚠️ No cached grades found');
-        return [];
-      }
-      print('✅ Loaded ${rows.length} cached grades');
       return rows
           .map(
             (row) =>

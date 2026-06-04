@@ -19,7 +19,7 @@ class OfflineDatabaseService extends GetxService {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -27,6 +27,23 @@ class OfflineDatabaseService extends GetxService {
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     print('🔄 Database upgrade: v$oldVersion → v$newVersion');
+    if (oldVersion < 3) {
+  try {
+    // Recreate grades_cache with UNIQUE constraint
+    await db.execute('DROP TABLE IF EXISTS grades_cache');
+    await db.execute('''
+      CREATE TABLE grades_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        cached_at TEXT NOT NULL
+      )
+    ''');
+    print('✅ Recreated grades_cache with UNIQUE constraint');
+  } catch (e) {
+    print('⚠️ Error upgrading grades_cache: $e');
+  }
+}
 
     if (oldVersion < 2) {
       print(
@@ -237,7 +254,7 @@ class OfflineDatabaseService extends GetxService {
     await db.execute('''
   CREATE TABLE IF NOT EXISTS grades_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    code TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE, 
     name TEXT NOT NULL,
     cached_at TEXT NOT NULL
   )

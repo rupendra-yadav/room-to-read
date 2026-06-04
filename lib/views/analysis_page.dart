@@ -6,6 +6,36 @@ import 'package:room_to_read/widgets/custom_app_bar.dart';
 class AnalysisPage extends GetView<AnalysisController> {
   const AnalysisPage({Key? key}) : super(key: key);
 
+  Color getStatusColor(String? status) {
+    switch (status) {
+      case '1':
+        return Colors.blue;
+      case '2':
+        return Colors.green;
+      case '3':
+        return Colors.orange;
+      case '4':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String getStatusText(String? status) {
+    switch (status) {
+      case '1':
+        return 'जारी किया गया';
+      case '2':
+        return 'वापस किया गया';
+      case '3':
+        return 'क्षतिग्रस्त';
+      case '4':
+        return 'खो गया';
+      default:
+        return 'अज्ञात';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -52,59 +82,59 @@ class AnalysisPage extends GetView<AnalysisController> {
                       child: SizedBox(), // Better than Spacer for this use case
                     ),
                     // Debug button (for testing)
-                    GestureDetector(
-                      onTap: () {
-                        controller.debugAnalyticsState();
-                      },
-                      child: Container(
-                        padding: EdgeInsets.all(6),
-                        margin: EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Icon(
-                          Icons.bug_report,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                    // Refresh button
-                    Obx(
-                      () => GestureDetector(
-                        onTap: controller.isLoading.value
-                            ? null
-                            : () {
-                                controller.refreshAnalytics();
-                              },
-                        child: Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(
-                              controller.isLoading.value ? 0.1 : 0.2,
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: controller.isLoading.value
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.refresh,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                        ),
-                      ),
-                    ),
+                    // GestureDetector(
+                    //   onTap: () {
+                    //     controller.debugAnalyticsState();
+                    //   },
+                    //   child: Container(
+                    //     padding: EdgeInsets.all(6),
+                    //     margin: EdgeInsets.only(right: 8),
+                    //     decoration: BoxDecoration(
+                    //       color: Colors.white.withOpacity(0.15),
+                    //       borderRadius: BorderRadius.circular(4),
+                    //     ),
+                    //     child: Icon(
+                    //       Icons.bug_report,
+                    //       color: Colors.white,
+                    //       size: 16,
+                    //     ),
+                    //   ),
+                    // ),
+                    // // Refresh button
+                    // Obx(
+                    //   () => GestureDetector(
+                    //     onTap: controller.isLoading.value
+                    //         ? null
+                    //         : () {
+                    //             controller.refreshAnalytics();
+                    //           },
+                    //     child: Container(
+                    //       padding: EdgeInsets.all(8),
+                    //       decoration: BoxDecoration(
+                    //         color: Colors.white.withOpacity(
+                    //           controller.isLoading.value ? 0.1 : 0.2,
+                    //         ),
+                    //         borderRadius: BorderRadius.circular(6),
+                    //       ),
+                    //       child: controller.isLoading.value
+                    //           ? SizedBox(
+                    //               width: 20,
+                    //               height: 20,
+                    //               child: CircularProgressIndicator(
+                    //                 strokeWidth: 2,
+                    //                 valueColor: AlwaysStoppedAnimation<Color>(
+                    //                   Colors.white,
+                    //                 ),
+                    //               ),
+                    //             )
+                    //           : Icon(
+                    //               Icons.refresh,
+                    //               color: Colors.white,
+                    //               size: 20,
+                    //             ),
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
@@ -441,12 +471,8 @@ class AnalysisPage extends GetView<AnalysisController> {
                                     report['book_name'] ?? 'N/A',
                                     'छात्र: ${report['student_name'] ?? 'N/A'}',
                                     'जारी: ${report['F4_DATE1'] ?? 'N/A'}${report['F4_DATE2'] != null && report['F4_DATE2'] != report['F4_DATE1'] ? ' • लौटा: ${report['F4_DATE2']}' : ''}',
-                                    report['F4_BT'] == '1'
-                                        ? 'जारी है'
-                                        : 'वापस की गई',
-                                    report['F4_BT'] == '1'
-                                        ? Colors.blue
-                                        : Colors.green,
+                                    getStatusText(report['F4_BT']),
+                                    getStatusColor(report['F4_BT']),
                                     isMobile,
                                   ),
                                 );
