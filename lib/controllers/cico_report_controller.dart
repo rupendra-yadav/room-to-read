@@ -18,6 +18,7 @@ class CicoReportController extends GetxController {
   var filteredBookIssues = <Map<String, dynamic>>[].obs;
   var grades = <Grade>[].obs;
   var isLoading = false.obs;
+  int _requestId = 0;
 
   final TextEditingController searchController = TextEditingController();
 
@@ -74,8 +75,14 @@ class CicoReportController extends GetxController {
     try {
       isLoading.value = true;
 
-      // Force UI update for loading state
-      isLoading.refresh();
+      final requestId = ++_requestId;
+
+      // ✅ Clear immediately so old data never shows
+      bookIssues.clear();
+      filteredBookIssues.clear();
+      searchQuery.value = '';
+      bookIssues.refresh();
+      filteredBookIssues.refresh();
 
       final currentUser = _authService.currentUser.value;
       if (currentUser == null) {
@@ -120,6 +127,7 @@ class CicoReportController extends GetxController {
 
         if (fallbackList.isNotEmpty) {
           // Use fallback data
+          if (requestId != _requestId) return;
           _processReportData(fallbackList, 'fallback checked out books');
           return;
         } else {
@@ -143,6 +151,7 @@ class CicoReportController extends GetxController {
       }
 
       // Process the CICO report data
+      if (requestId != _requestId) return;
       _processReportData(reportList, 'CICO report API');
     } catch (e) {
       print('❌ Error in fetchBookIssues: $e');
@@ -232,6 +241,15 @@ class CicoReportController extends GetxController {
 
   void selectClass(Grade grade) {
     selectedClass.value = grade.name;
+
+    bookIssues.clear();
+    filteredBookIssues.clear();
+
+    bookIssues.refresh();
+    filteredBookIssues.refresh();
+
+    searchQuery.value = '';
+
     fetchBookIssues(className: grade.name);
   }
 

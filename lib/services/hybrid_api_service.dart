@@ -212,31 +212,27 @@ class HybridApiService extends GetxService {
 
   Future<Map<String, dynamic>> checkout({
     required String teacherId,
-    required String bookId,
-    required String bookCode,
+    required List<Map<String, dynamic>> books,
     required String studentId,
     required String className,
     String? programId,
     String? schoolId,
-    String? studentName, // ✅ NEW: Accept student name for offline storage
-    String? bookName, // ✅ NEW: Accept book name for offline storage
+    String? studentName,
   }) async {
-    if (bookId.trim().isEmpty) {
-      return {'success': false, 'message': 'Invalid book id'};
+    if (books.isEmpty) {
+      return {'success': false, 'message': 'No books selected'};
     }
 
     if (_connectivityService.isOnline.value) {
       try {
         return await _apiService.checkout(
           teacherId: teacherId,
-          bookId: bookId,
-          bookCode: bookCode, // ✅ Pass bookCode
+          books: books,
           studentId: studentId,
           className: className,
           programId: programId,
           schoolId: schoolId,
-          studentName: studentName, // ✅ Pass student name
-          bookName: bookName, // ✅ Pass book name
+          studentName: studentName,
         );
       } catch (e) {
         return {'success': false, 'message': 'Online checkout failed: $e'};
@@ -244,21 +240,27 @@ class HybridApiService extends GetxService {
     }
 
     try {
-      final transactionId = await _offlineDb.saveOfflineCheckout(
-        teacherId: teacherId,
-        bookId: bookId,
-        bookCode: bookCode,
-        studentId: studentId,
-        className: className,
-        studentName: studentName, // ✅ Pass student name
-        bookName: bookName, // ✅ Pass book name
-      );
+      final List<String> transactionIds = [];
+
+      for (final book in books) {
+        final transactionId = await _offlineDb.saveOfflineCheckout(
+          teacherId: teacherId,
+          bookId: book['bookId'].toString(),
+          bookCode: book['bookCode'].toString(),
+          studentId: studentId,
+          className: className,
+          studentName: studentName,
+          bookName: book['bookName']?.toString(),
+        );
+
+        transactionIds.add(transactionId.toString());
+      }
 
       return {
         'success': true,
         'offline': true,
-        'transactionId': transactionId,
-        'message': 'Book issued offline. Will sync later.',
+        'transactionIds': transactionIds,
+        'message': '${books.length} books issued offline. Will sync later.',
       };
     } catch (e) {
       return {'success': false, 'message': 'Offline checkout failed: $e'};

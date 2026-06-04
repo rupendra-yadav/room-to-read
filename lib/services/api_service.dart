@@ -369,155 +369,76 @@ class ApiService extends GetxService {
 
   Future<Map<String, dynamic>> checkout({
     required String teacherId,
-    required String bookId,
+    required List<Map<String, dynamic>> books,
     required String studentId,
     required String className,
     String? programId,
     String? schoolId,
-    String? bookCode, // Accept bookCode parameter
-    String? studentName, // ✅ NEW: Accept student name for offline storage
-    String? bookName, // ✅ NEW: Accept book name for offline storage
+    String? studentName,
   }) async {
     try {
-      // Get current user for additional required fields
       final authService = Get.find<AuthService>();
       final currentUser = authService.currentUser.value;
 
       if (currentUser == null) {
-        throw Exception('User not logged in - cannot perform checkout');
+        throw Exception('User not logged in');
       }
 
-      // Use fallback values from current user if not provided
-      // ✅ FIXED: Use group (M1_GROUP) for school_id and group1 (M1_GROUP1) for program_id
-      final finalSchoolId = schoolId ?? currentUser.group; // M1_GROUP = 2014
-      final finalProgramId =
-          programId ?? currentUser.group1; // M1_GROUP1 = 3898
-      // ✅ CHECK CONNECTIVITY FIRST
+      final finalSchoolId = schoolId ?? currentUser.group;
+      final finalProgramId = programId ?? currentUser.group1;
+
       final connectivityService = Get.find<ConnectivityService>();
-      final isOnline = connectivityService.isOnline.value;
 
-      print(
-        '📡 CHECKOUT: Connection status = ${connectivityService.isOnline.value}',
-      );
-
-      if (!isOnline) {
-        print('📱 CHECKOUT: Device is OFFLINE - Saving to local database...');
-
-        try {
-          // Save to offline database
-          final offlineDb = Get.find<OfflineDatabaseService>();
-
-          // Use bookCode if provided, otherwise use bookId
-          final finalBookCode = bookCode ?? bookId;
-
-          await offlineDb.saveOfflineCheckout(
-            teacherId: teacherId,
-            bookId: bookId,
-            bookCode: finalBookCode,
-            studentId: studentId,
-            className: className,
-            studentName: studentName, // ✅ Pass student name if provided
-            bookName: bookName, // ✅ Pass book name if provided
-          );
-
-          print('✅ CHECKOUT: Saved to offline database successfully');
-          return {
-            'success': true,
-            'message': 'किताब ऑफलाइन दी गई! 📱',
-            'offline': true,
-            'data': 1,
-          };
-        } catch (offlineError) {
-          print('❌ CHECKOUT: Failed to save offline - $offlineError');
-          return {
-            'success': false,
-            'message': 'Failed to save offline: $offlineError',
-          };
-        }
+      if (!connectivityService.isOnline.value) {
+        throw Exception('Multiple checkout is currently supported only online');
       }
 
-      // Device is online - proceed with API call
-      print('🌐 CHECKOUT: Device is ONLINE - Calling API...');
-
-      // Build FormData with all mandatory backend fields
       final formData = FormData({
-        // Backend field mappings (as per your PHP code):
-        'F4_LCODE': bookId, // Book code (primary - use M1_CODE)
-        'teacher_id': teacherId, // F4_USERADD
-        'book_id': bookId, // F4_PARTY (fallback)
-        'student_id': studentId, // F4_PARTY1
-        'program_id': finalProgramId, // F4_GR
-        'school_id': finalSchoolId, // F4_TRP
+        'teacher_id': teacherId,
+        'student_id': studentId,
+        'program_id': finalProgramId,
+        'school_id': finalSchoolId,
         'grade': className,
-        'M1_GROUP': finalSchoolId, // ✅ NEW: School ID as M1_GROUP
-        'M1GROUP1': finalProgramId, // ✅ NEW: Program ID as M1GROUP1
+        'M1_GROUP': finalSchoolId,
+        'M1GROUP1': finalProgramId,
       });
 
-      print('📋 CHECKOUT: FormData prepared:');
-      print('   F4_LCODE (M1_CODE): $bookId');
-      print('   teacher_id: $teacherId');
-      print('   student_id: $studentId');
-      print('   F4_TXT2: $className');
-      print('   program_id: $finalProgramId');
-      print('   school_id: $finalSchoolId');
-      print('   M1_GROUP: $finalSchoolId');
-      print('   M1GROUP1: $finalProgramId');
+      for (int i = 0; i < books.length; i++) {
+        formData.fields.add(
+          MapEntry('books[$i][book_id]', books[i]['bookId'].toString()),
+        );
+      }
+      log('📤 CHECKOUT: Sending to ${ApiConfig.checkoutUrl}');
+      log('📋 CHECKOUT: Form data: $books');
 
-      final stopwatch = Stopwatch()..start();
-
-      print('📤 CHECKOUT: Sending to ${ApiConfig.checkoutUrl}');
-      print('📋 CHECKOUT: Form data: $formData');
-
-      var response = await GetConnect().post(ApiConfig.checkoutUrl, formData);
-
-      stopwatch.stop();
-
-      print('📊 CHECKOUT: Response status: ${response.statusCode}');
-      print('📊 CHECKOUT: Response body: ${response.body}');
-      print('⏱️ CHECKOUT: Request took ${stopwatch.elapsedMilliseconds}ms');
+      final response = await GetConnect().post(ApiConfig.checkoutUrl, formData);
 
       if (response.statusCode == 200) {
-        var data = response.body;
+        dynamic data = response.body;
 
-        // If data is a string, parse it as JSON
         if (data is String) {
-          try {
-            data = jsonDecode(data);
-          } catch (jsonError) {
-            throw Exception('Invalid JSON response: $jsonError');
-          }
-        } else {}
+          data = jsonDecode(data);
+        }
 
-        if (data is Map) {
-          if (data['response'] == 'success') {
-            final result = {
-              'success': true,
-              'message': data['message'] ?? 'Book Issued!',
-              'data': data['data'] ?? 1,
-              'offline': false,
-            };
-            return result;
-          } else {
-            final result = {
-              'success': false,
-              'message': data['message'] ?? 'Checkout failed',
-            };
-            return result;
-          }
-        } else {
+        if (data['response'] == 'success') {
           return {
-            'success': false,
-            'message':
-                'Invalid response format - expected Map, got ${data.runtimeType}',
+            'success': true,
+            'message': data['message'] ?? 'Books issued successfully',
+            'data': data['data'],
+            'offline': false,
           };
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.statusText}');
+
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Checkout failed',
+        };
       }
+
+      return {'success': false, 'message': 'HTTP ${response.statusCode}'};
     } catch (e) {
-      print('❌ CHECKOUT: API Exception - $e');
-      return {'success': false, 'message': 'API Error: $e'};
-    } finally {}
+      return {'success': false, 'message': e.toString()};
+    }
   }
 
   Future<Map<String, dynamic>> checkin({
@@ -876,7 +797,7 @@ class ApiService extends GetxService {
       if (className != null &&
           className.isNotEmpty &&
           className != 'सभी कक्षाएं') {
-        body['class'] = className;
+        body['grade'] = className;
       }
 
       if (dateFrom != null && dateFrom.isNotEmpty) {
@@ -1584,7 +1505,18 @@ class ApiService extends GetxService {
                   );
                   final indResult = await checkout(
                     teacherId: record['teacher_id']?.toString() ?? '',
-                    bookId: record['book_id']?.toString() ?? '',
+                    books: [
+                      {
+                        'bookId': record['book_id']?.toString() ?? '',
+                        'bookCode':
+                            record['F4_LCODE']?.toString() ??
+                            record['book_id']?.toString() ??
+                            '',
+                        'bookName': record['book_name']?.toString() ?? '',
+                        'author': '',
+                        'availableCopies': 1,
+                      },
+                    ],
                     studentId: record['student_id']?.toString() ?? '',
                     className: record['class']?.toString() ?? '',
                     programId: record['program_id']?.toString() ?? '',
@@ -1750,7 +1682,15 @@ class ApiService extends GetxService {
       // Test individual checkout
       final individualCheckoutResult = await checkout(
         teacherId: 'DEBUG_TEACHER',
-        bookId: 'DEBUG_BOOK',
+        books: [
+          {
+            'bookId': 'DEBUG_BOOK',
+            'bookCode': 'DEBUG_BOOK',
+            'bookName': 'Debug Book',
+            'author': '',
+            'availableCopies': 1,
+          },
+        ],
         studentId: 'DEBUG_STUDENT',
         className: 'DEBUG_CLASS',
         programId: 'DEBUG_PROGRAM',

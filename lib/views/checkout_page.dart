@@ -117,7 +117,8 @@ class CheckoutPage extends GetView<CheckoutController> {
                         ],
                       ),
                     ),
-                    // Selected Student Display - Show when student is selected
+
+                    // ── Selected Student Display ──────────────────────────────
                     Obx(() {
                       if (controller.selectedStudent.value == null) {
                         return const SizedBox.shrink();
@@ -168,7 +169,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                         color: Colors.blue[600],
                                         size: isMobile ? 16 : 18,
                                       ),
-                                      SizedBox(width: 6),
+                                      const SizedBox(width: 6),
                                       Text(
                                         'चयनित छात्र',
                                         style: TextStyle(
@@ -179,7 +180,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
                                     student.name,
                                     style: TextStyle(
@@ -199,11 +200,9 @@ class CheckoutPage extends GetView<CheckoutController> {
                               ),
                             ),
                             GestureDetector(
-                              onTap: () {
-                                controller.clearStudentSelection();
-                              },
+                              onTap: () => controller.clearStudentSelection(),
                               child: Container(
-                                padding: EdgeInsets.all(6),
+                                padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
                                   color: Colors.blue[100],
                                   borderRadius: BorderRadius.circular(6),
@@ -219,12 +218,12 @@ class CheckoutPage extends GetView<CheckoutController> {
                         ),
                       );
                     }),
-                    // Selected Book Display - Show when book is selected
+
+                    // ── Selected Books Display (multi-select list) ────────────
                     Obx(() {
-                      if (controller.selectedBook.value == null) {
+                      if (controller.selectedBooks.isEmpty) {
                         return const SizedBox.shrink();
                       }
-                      final book = controller.selectedBook.value!;
                       return Container(
                         margin: EdgeInsets.symmetric(
                           horizontal: horizontalPadding,
@@ -235,92 +234,29 @@ class CheckoutPage extends GetView<CheckoutController> {
                           color: Colors.green[50],
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.green[300]!),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.green.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: isMobile ? 48 : 52,
-                              height: isMobile ? 48 : 52,
-                              decoration: BoxDecoration(
-                                color: Colors.green[100],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(
+                        child: Column(
+                          children: controller.selectedBooks.map((book) {
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
                                 Icons.menu_book,
                                 color: Colors.green[700],
-                                size: isMobile ? 26 : 28,
                               ),
-                            ),
-                            SizedBox(width: isMobile ? 12 : 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green[600],
-                                        size: isMobile ? 16 : 18,
-                                      ),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'चयनित किताब',
-                                        style: TextStyle(
-                                          color: Colors.green[600],
-                                          fontSize: isMobile ? 12 : 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    book.title,
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: isMobile ? 16 : 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${book.author} • कोड: ${book.bookCode} • उपलब्ध: ${book.availableCopies}',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: isMobile ? 12 : 13,
-                                    ),
-                                  ),
-                                ],
+                              title: Text(book.title),
+                              subtitle: Text(
+                                '${book.author} • कोड: ${book.bookCode} • उपलब्ध: ${book.availableCopies}',
                               ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                controller.clearBookSelection();
-                              },
-                              child: Container(
-                                padding: EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[100],
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Icon(
-                                  Icons.close,
-                                  color: Colors.green[700],
-                                  size: isMobile ? 16 : 18,
-                                ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => controller.removeBook(book),
                               ),
-                            ),
-                          ],
+                            );
+                          }).toList(),
                         ),
                       );
                     }),
+
                     Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: horizontalPadding,
@@ -329,7 +265,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Step 1: Select Student
+                          // ── Step 1: Select Student ──────────────────────────
                           _buildStepHeader('1', 'छात्र का चयन करें', isMobile),
                           SizedBox(height: isMobile ? 10 : 12),
                           Container(
@@ -363,75 +299,28 @@ class CheckoutPage extends GetView<CheckoutController> {
                             ),
                           ),
                           SizedBox(height: isMobile ? 12 : 14),
-                          // Students Search Results - Hide when student is selected
+
+                          // Students Search Results
                           Obx(() {
-                            // Hide student list if a student is already selected
                             if (controller.selectedStudent.value != null) {
                               return const SizedBox.shrink();
                             }
-
-                            // Show message if no class selected
                             if (controller.selectedClass.value.isEmpty) {
-                              return Container(
-                                padding: EdgeInsets.all(isMobile ? 16 : 20),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.blue[200]!),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: Colors.blue[700],
-                                      size: isMobile ? 20 : 22,
-                                    ),
-                                    SizedBox(width: isMobile ? 10 : 12),
-                                    Expanded(
-                                      child: Text(
-                                        'पहले ग्रेड चुनें',
-                                        style: TextStyle(
-                                          color: Colors.blue[900],
-                                          fontSize: isMobile ? 13 : 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              return _buildInfoBox(
+                                icon: Icons.info_outline,
+                                color: Colors.blue,
+                                text: 'पहले ग्रेड चुनें',
+                                isMobile: isMobile,
                               );
                             }
-
-                            // ✅ NEW: Show message if class is selected but no search query
                             if (studentController.searchQuery.value.isEmpty) {
-                              return Container(
-                                padding: EdgeInsets.all(isMobile ? 16 : 20),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.green[200]!),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.search,
-                                      color: Colors.green[700],
-                                      size: isMobile ? 20 : 22,
-                                    ),
-                                    SizedBox(width: isMobile ? 10 : 12),
-                                    Expanded(
-                                      child: Text(
-                                        'छात्र का नाम या रोल नंबर टाइप करें',
-                                        style: TextStyle(
-                                          color: Colors.green[900],
-                                          fontSize: isMobile ? 13 : 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              return _buildInfoBox(
+                                icon: Icons.search,
+                                color: Colors.green,
+                                text: 'छात्र का नाम या रोल नंबर टाइप करें',
+                                isMobile: isMobile,
                               );
                             }
-
                             if (studentController.filteredStudents.isEmpty) {
                               return Container(
                                 padding: EdgeInsets.all(isMobile ? 16 : 20),
@@ -442,9 +331,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    studentController.searchQuery.value.isEmpty
-                                        ? 'इस ग्रेड में कोई छात्र नहीं मिला'
-                                        : 'कोई छात्र नहीं मिला',
+                                    'कोई छात्र नहीं मिला',
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: isMobile ? 13 : 14,
@@ -477,9 +364,8 @@ class CheckoutPage extends GetView<CheckoutController> {
                                         controller.selectedStudent.value.id ==
                                             student.id;
                                     return GestureDetector(
-                                      onTap: () {
-                                        controller.selectStudent(student);
-                                      },
+                                      onTap: () =>
+                                          controller.selectStudent(student),
                                       child: Container(
                                         padding: EdgeInsets.all(
                                           isMobile ? 12 : 14,
@@ -560,8 +446,10 @@ class CheckoutPage extends GetView<CheckoutController> {
                               ),
                             );
                           }),
+
                           SizedBox(height: isMobile ? 20 : 24),
-                          // Step 2: Select Book
+
+                          // ── Step 2: Select Book ─────────────────────────────
                           _buildStepHeader('2', 'किताब का चयन करें', isMobile),
                           SizedBox(height: isMobile ? 10 : 12),
                           Container(
@@ -594,39 +482,18 @@ class CheckoutPage extends GetView<CheckoutController> {
                             ),
                           ),
                           SizedBox(height: isMobile ? 12 : 14),
+
                           // Books Search Results
                           Obx(() {
-                            // Show message if no search query
                             if (bookController.searchQuery.value.isEmpty) {
-                              return Container(
-                                padding: EdgeInsets.all(isMobile ? 16 : 20),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.green[200]!),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: Colors.green[700],
-                                      size: isMobile ? 20 : 22,
-                                    ),
-                                    SizedBox(width: isMobile ? 10 : 12),
-                                    Expanded(
-                                      child: Text(
-                                        'किताब खोजने के लिए नाम, लेखक या ID टाइप करें',
-                                        style: TextStyle(
-                                          color: Colors.green[900],
-                                          fontSize: isMobile ? 13 : 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              return _buildInfoBox(
+                                icon: Icons.info_outline,
+                                color: Colors.green,
+                                text:
+                                    'किताब खोजने के लिए नाम, लेखक या ID टाइप करें',
+                                isMobile: isMobile,
                               );
                             }
-
                             if (bookController.filteredBooks.isEmpty) {
                               return Container(
                                 padding: EdgeInsets.all(isMobile ? 16 : 20),
@@ -663,92 +530,23 @@ class CheckoutPage extends GetView<CheckoutController> {
                                   final book =
                                       bookController.filteredBooks[index];
                                   return Obx(() {
-                                    // Check if this book is selected
-                                    // Use both bookCode and bookId for comparison, but only if they're not empty
-                                    final isSelected =
-                                        controller.selectedBook.value != null &&
-                                        ((controller
-                                                    .selectedBook
-                                                    .value
-                                                    .bookCode
-                                                    .isNotEmpty &&
-                                                book.bookCode.isNotEmpty &&
-                                                controller
-                                                        .selectedBook
-                                                        .value
-                                                        .bookCode ==
-                                                    book.bookCode) ||
-                                            (controller
-                                                    .selectedBook
-                                                    .value
-                                                    .bookId
-                                                    .isNotEmpty &&
-                                                book.bookId.isNotEmpty &&
-                                                controller
-                                                        .selectedBook
-                                                        .value
-                                                        .bookId ==
-                                                    book.bookId));
+                                    // ✅ FIX: Check against selectedBooks list, not selectedBook
+                                    final isSelected = controller.selectedBooks
+                                        .any(
+                                          (b) =>
+                                              (b.bookCode.isNotEmpty &&
+                                                  book.bookCode.isNotEmpty &&
+                                                  b.bookCode ==
+                                                      book.bookCode) ||
+                                              (b.bookId.isNotEmpty &&
+                                                  book.bookId.isNotEmpty &&
+                                                  b.bookId == book.bookId),
+                                        );
 
                                     return GestureDetector(
                                       onTap: () {
-                                        // Debug: Log complete book selection details
-                                        print(
-                                          '\n📚 ========== BOOK SELECTED ==========',
-                                        );
-                                        print('   📖 Title: "${book.title}"');
-                                        print(
-                                          '   📝 Book Name (EN): "${book.bookRomanName}"',
-                                        );
-                                        print(
-                                          '   📝 Book Name (Local): "${book.bookLocalName}"',
-                                        );
-                                        print(
-                                          '   🏷️  BookId (M1_CODE): "${book.bookId}"',
-                                        );
-                                        print(
-                                          '   🏷️  BookCode (M1_NO): "${book.bookCode}"',
-                                        );
-                                        print('   👤 Author: "${book.author}"');
-                                        print(
-                                          '   📊 Available Copies: ${book.availableCopies}',
-                                        );
-                                        print(
-                                          '   📚 Total Copies: ${book.totalCopies}',
-                                        );
-                                        print(
-                                          '   ⬆️  Issued Copies: ${book.issuedCopies}',
-                                        );
-                                        print(
-                                          '   🔴 Reading Level: ${book.readingLevel}',
-                                        );
-                                        print(
-                                          '   ✅ Is Active: ${book.isActive}',
-                                        );
-                                        print(
-                                          '   🎓 Program Code: "${book.programCode}"',
-                                        );
-                                        print(
-                                          '   Currently Selected: ${controller.selectedBook.value?.title ?? "None"}',
-                                        );
-                                        print(
-                                          '=====================================\n',
-                                        );
-
-                                        // Check if this book is already selected
-                                        if (controller.selectedBook.value !=
-                                                null &&
-                                            (controller
-                                                        .selectedBook
-                                                        .value
-                                                        .bookCode ==
-                                                    book.bookCode ||
-                                                controller
-                                                        .selectedBook
-                                                        .value
-                                                        .bookId ==
-                                                    book.bookId)) {
-                                          print('⚠️ Book already selected');
+                                        // ✅ FIX: Check against selectedBooks list
+                                        if (isSelected) {
                                           Get.snackbar(
                                             'पहले से चयनित',
                                             'यह किताब पहले से चयनित है।',
@@ -760,22 +558,12 @@ class CheckoutPage extends GetView<CheckoutController> {
                                           );
                                           return;
                                         }
-
-                                        // Only allow selection if book is available
-                                        // Only allow selection if book is available
                                         if (book.availableCopies > 0) {
-                                          print(
-                                            '✅ Selecting book: ${book.title}',
-                                          );
                                           controller.selectBook(book);
-                                          // Clear search field and close results dropdown
                                           controller.bookSearchController
                                               .clear();
                                           bookController.searchBooks('');
                                         } else {
-                                          print(
-                                            '❌ Book not available: ${book.availableCopies} copies',
-                                          );
                                           Get.snackbar(
                                             'उपलब्ध नहीं',
                                             'यह किताब उपलब्ध नहीं है। उपलब्ध प्रतियां: ${book.availableCopies}',
@@ -855,76 +643,45 @@ class CheckoutPage extends GetView<CheckoutController> {
                                                           : 13,
                                                     ),
                                                   ),
-                                                  if (book.bookId.isNotEmpty)
-                                                    // Text(
-                                                    //   'Book ID: ${book.bookId}',
-                                                    //   style: TextStyle(
-                                                    //     color: Colors.grey[600],
-                                                    //     fontSize: isMobile
-                                                    //         ? 11
-                                                    //         : 12,
-                                                    //   ),
-                                                    // ),
-                                                    // Text(
-                                                    //   'Code: ${book.bookCode}',
-                                                    //   style: TextStyle(
-                                                    //     color: Colors.grey[600],
-                                                    //     fontSize: isMobile
-                                                    //         ? 11
-                                                    //         : 12,
-                                                    //   ),
-                                                    // ),
-                                                    // Copy information
-                                                    // Text(
-                                                    //   'कुल: ${book.totalCopies} | उपलब्ध: ${book.availableCopies} | जारी: ${book.issuedCopies}',
-                                                    //   style: TextStyle(
-                                                    //     color: Colors.grey[700],
-                                                    //     fontSize: isMobile
-                                                    //         ? 11
-                                                    //         : 12,
-                                                    //     fontWeight: FontWeight.w500,
-                                                    //   ),
-                                                    // ),
-                                                    // Availability indicator
-                                                    Row(
-                                                      children: [
-                                                        Icon(
-                                                          book.availableCopies <=
-                                                                  0
-                                                              ? Icons
-                                                                    .error_outline
-                                                              : Icons
-                                                                    .check_circle_outline,
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        book.availableCopies <=
+                                                                0
+                                                            ? Icons
+                                                                  .error_outline
+                                                            : Icons
+                                                                  .check_circle_outline,
+                                                        color:
+                                                            book.availableCopies <=
+                                                                0
+                                                            ? Colors.red
+                                                            : Colors.green,
+                                                        size: isMobile
+                                                            ? 14
+                                                            : 16,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        book.availableCopies <=
+                                                                0
+                                                            ? 'उपलब्ध नहीं'
+                                                            : 'उपलब्ध: ${book.availableCopies}',
+                                                        style: TextStyle(
                                                           color:
                                                               book.availableCopies <=
                                                                   0
                                                               ? Colors.red
                                                               : Colors.green,
-                                                          size: isMobile
-                                                              ? 14
-                                                              : 16,
+                                                          fontSize: isMobile
+                                                              ? 10
+                                                              : 11,
+                                                          fontWeight:
+                                                              FontWeight.w500,
                                                         ),
-                                                        SizedBox(width: 4),
-                                                        Text(
-                                                          book.availableCopies <=
-                                                                  0
-                                                              ? 'उपलब्ध नहीं'
-                                                              : 'उपलब्ध: ${book.availableCopies}',
-                                                          style: TextStyle(
-                                                            color:
-                                                                book.availableCopies <=
-                                                                    0
-                                                                ? Colors.red
-                                                                : Colors.green,
-                                                            fontSize: isMobile
-                                                                ? 10
-                                                                : 11,
-                                                            fontWeight:
-                                                                FontWeight.w500,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ],
                                               ),
                                             ),
@@ -950,129 +707,22 @@ class CheckoutPage extends GetView<CheckoutController> {
                               ),
                             );
                           }),
+
                           SizedBox(height: isMobile ? 20 : 24),
-                          // Summary Section - Only show when both selected
+
+                          // ── Summary Section ─────────────────────────────────
+                          // Show only when both student and at least one book are selected
                           Obx(() {
                             if (controller.selectedStudent.value == null ||
-                                controller.selectedBook.value == null) {
+                                controller.selectedBooks.isEmpty) {
                               return const SizedBox.shrink();
                             }
-                            final student = controller.selectedStudent.value;
-                            final book = controller.selectedBook.value;
+                            final student = controller.selectedStudent.value!;
+
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Selected Student Card
-                                // Container(
-                                //   padding: EdgeInsets.all(isMobile ? 12 : 14),
-                                //   decoration: BoxDecoration(
-                                //     color: Colors.blue[50],
-                                //     borderRadius: BorderRadius.circular(8),
-                                //     border: Border.all(
-                                //       color: Colors.blue[200]!,
-                                //     ),
-                                //   ),
-                                //   child: Row(
-                                //     children: [
-                                //       Container(
-                                //         width: isMobile ? 44 : 48,
-                                //         height: isMobile ? 44 : 48,
-                                //         decoration: BoxDecoration(
-                                //           color: Colors.blue[100],
-                                //           borderRadius: BorderRadius.circular(
-                                //             8,
-                                //           ),
-                                //         ),
-                                //         child: Icon(
-                                //           Icons.person,
-                                //           color: Colors.blue[700],
-                                //           size: isMobile ? 24 : 26,
-                                //         ),
-                                //       ),
-                                //       SizedBox(width: isMobile ? 10 : 12),
-                                //       Expanded(
-                                //         child: Column(
-                                //           crossAxisAlignment:
-                                //               CrossAxisAlignment.start,
-                                //           children: [
-                                //             Text(
-                                //               student.name,
-                                //               style: TextStyle(
-                                //                 color: Colors.black,
-                                //                 fontSize: isMobile ? 14 : 15,
-                                //                 fontWeight: FontWeight.bold,
-                                //               ),
-                                //             ),
-                                //             Text(
-                                //               'ID: ${student.id} • कक्षा: ${student.className}',
-                                //               style: TextStyle(
-                                //                 color: Colors.grey[600],
-                                //                 fontSize: isMobile ? 12 : 13,
-                                //               ),
-                                //             ),
-                                //           ],
-                                //         ),
-                                //       ),
-                                //     ],
-                                //   ),
-                                // ),
-                                // SizedBox(height: isMobile ? 12 : 14),
-                                // // Selected Book Card
-                                // Container(
-                                //   padding: EdgeInsets.all(isMobile ? 12 : 14),
-                                //   decoration: BoxDecoration(
-                                //     color: Colors.green[50],
-                                //     borderRadius: BorderRadius.circular(8),
-                                //     border: Border.all(
-                                //       color: Colors.green[200]!,
-                                //     ),
-                                //   ),
-                                //   child: Row(
-                                //     children: [
-                                //       Container(
-                                //         width: isMobile ? 44 : 48,
-                                //         height: isMobile ? 44 : 48,
-                                //         decoration: BoxDecoration(
-                                //           color: Colors.green[100],
-                                //           borderRadius: BorderRadius.circular(
-                                //             8,
-                                //           ),
-                                //         ),
-                                //         child: Icon(
-                                //           Icons.menu_book,
-                                //           color: Colors.green[700],
-                                //           size: isMobile ? 24 : 26,
-                                //         ),
-                                //       ),
-                                //       SizedBox(width: isMobile ? 10 : 12),
-                                //       Expanded(
-                                //         child: Column(
-                                //           crossAxisAlignment:
-                                //               CrossAxisAlignment.start,
-                                //           children: [
-                                //             Text(
-                                //               book.title,
-                                //               style: TextStyle(
-                                //                 color: Colors.black,
-                                //                 fontSize: isMobile ? 14 : 15,
-                                //                 fontWeight: FontWeight.bold,
-                                //               ),
-                                //             ),
-                                //             Text(
-                                //               book.author,
-                                //               style: TextStyle(
-                                //                 color: Colors.grey[600],
-                                //                 fontSize: isMobile ? 12 : 13,
-                                //               ),
-                                //             ),
-                                //           ],
-                                //         ),
-                                //       ),
-                                //     ],
-                                //   ),
-                                // ),
-                                SizedBox(height: isMobile ? 16 : 20),
-                                // Summary Box
+                                // ✅ FIX: Info box now summarises ALL selected books
                                 Container(
                                   padding: EdgeInsets.all(isMobile ? 14 : 16),
                                   decoration: BoxDecoration(
@@ -1101,53 +751,21 @@ class CheckoutPage extends GetView<CheckoutController> {
                                       ),
                                       SizedBox(width: isMobile ? 10 : 12),
                                       Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'कुल पुस्तकें ',
-                                              style: TextStyle(
-                                                color: Colors.orange,
-                                                fontSize: isMobile ? 12 : 13,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            Text(
-                                              'बुक निर्गत पुस्तकें',
-                                              style: TextStyle(
-                                                color: Colors.orange,
-                                                fontSize: isMobile ? 11 : 12,
-                                              ),
-                                            ),
-                                          ],
+                                        child: Text(
+                                          'चयनित किताबें: ${controller.selectedBooks.length}',
+                                          style: TextStyle(
+                                            color: Colors.orange,
+                                            fontSize: isMobile ? 13 : 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                      ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            '${book.totalCopies}',
-                                            style: TextStyle(
-                                              color: Colors.orange,
-                                              fontSize: isMobile ? 13 : 14,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            'उपलब्ध: ${book.availableCopies}',
-                                            style: TextStyle(
-                                              color: Colors.orange,
-                                              fontSize: isMobile ? 11 : 12,
-                                            ),
-                                          ),
-                                        ],
                                       ),
                                     ],
                                   ),
                                 ),
+
                                 SizedBox(height: isMobile ? 16 : 20),
+
                                 // Summary Details
                                 Text(
                                   'सारांश',
@@ -1192,42 +810,56 @@ class CheckoutPage extends GetView<CheckoutController> {
                                         student.readingLevel.toString(),
                                         isMobile,
                                       ),
-                                      Divider(
-                                        color: Colors.grey[300],
-                                        height: isMobile ? 12 : 14,
-                                      ),
-                                      _buildSummaryRow(
-                                        'किताब',
-                                        book.title,
-                                        isMobile,
-                                      ),
-
-                                      Divider(
-                                        color: Colors.grey[300],
-                                        height: isMobile ? 12 : 14,
-                                      ),
-                                      _buildSummaryRow(
-                                        'शीर्ष प्रतियां',
-                                        '${book.availableCopies - 1}',
-                                        isMobile,
-                                      ),
+                                      // ✅ FIX: Show a row for EACH selected book
+                                      ...controller.selectedBooks
+                                          .asMap()
+                                          .entries
+                                          .map((entry) {
+                                            final idx = entry.key + 1;
+                                            final b = entry.value;
+                                            return Column(
+                                              children: [
+                                                Divider(
+                                                  color: Colors.grey[300],
+                                                  height: isMobile ? 12 : 14,
+                                                ),
+                                                _buildSummaryRow(
+                                                  'किताब $idx',
+                                                  b.title,
+                                                  isMobile,
+                                                ),
+                                                Divider(
+                                                  color: Colors.grey[300],
+                                                  height: isMobile ? 12 : 14,
+                                                ),
+                                                _buildSummaryRow(
+                                                  'उपलब्ध प्रतियां',
+                                                  '${b.availableCopies}',
+                                                  isMobile,
+                                                ),
+                                              ],
+                                            );
+                                          })
+                                          .toList(),
                                     ],
                                   ),
                                 ),
+
                                 SizedBox(height: isMobile ? 20 : 24),
-                                // Checkout Button
+
+                                // ── Checkout Button ─────────────────────────
                                 Obx(() {
-                                  final book = controller.selectedBook.value;
-                                  final isBookUnavailable =
-                                      book != null && book.availableCopies <= 0;
+                                  // ✅ FIX: Disable if ANY selected book is unavailable
+                                  final hasUnavailableBook = controller
+                                      .selectedBooks
+                                      .any((b) => b.availableCopies <= 0);
                                   final isDisabled =
                                       controller.isLoading.value ||
-                                      isBookUnavailable;
+                                      hasUnavailableBook;
 
                                   return Column(
                                     children: [
-                                      // Show warning if book is unavailable
-                                      if (isBookUnavailable)
+                                      if (hasUnavailableBook)
                                         Container(
                                           padding: EdgeInsets.all(
                                             isMobile ? 12 : 14,
@@ -1256,7 +888,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                               ),
                                               Expanded(
                                                 child: Text(
-                                                  'चयनित किताब उपलब्ध नहीं है। कृपया दूसरी किताब चुनें।',
+                                                  'एक या अधिक चयनित किताबें उपलब्ध नहीं हैं। कृपया उन्हें हटाएं।',
                                                   style: TextStyle(
                                                     color: Colors.red[700],
                                                     fontSize: isMobile
@@ -1275,7 +907,6 @@ class CheckoutPage extends GetView<CheckoutController> {
                                             : () async {
                                                 final result = await controller
                                                     .completeCheckout();
-
                                                 if (result['success'] == true) {
                                                   Get.snackbar(
                                                     'सफल',
@@ -1288,8 +919,6 @@ class CheckoutPage extends GetView<CheckoutController> {
                                                       seconds: 2,
                                                     ),
                                                   );
-
-                                                  // Navigate back to home with a fresh start
                                                   Get.offAndToNamed('/');
                                                 } else {
                                                   Get.snackbar(
@@ -1331,7 +960,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                                     ),
                                                   )
                                                 : Text(
-                                                    isBookUnavailable
+                                                    hasUnavailableBook
                                                         ? 'किताब उपलब्ध नहीं'
                                                         : 'चेक आउट करें',
                                                     style: TextStyle(
@@ -1349,6 +978,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                     ],
                                   );
                                 }),
+
                                 SizedBox(height: verticalPadding),
                               ],
                             );
@@ -1362,6 +992,36 @@ class CheckoutPage extends GetView<CheckoutController> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  Widget _buildInfoBox({
+    required IconData icon,
+    required MaterialColor color,
+    required String text,
+    required bool isMobile,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: color[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color[700], size: isMobile ? 20 : 22),
+          SizedBox(width: isMobile ? 10 : 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: color[900], fontSize: isMobile ? 13 : 14),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1412,12 +1072,15 @@ class CheckoutPage extends GetView<CheckoutController> {
             fontWeight: FontWeight.w500,
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: isMobile ? 13 : 14,
-            fontWeight: FontWeight.bold,
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: isMobile ? 13 : 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],

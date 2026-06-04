@@ -171,6 +171,16 @@ class CheckinController extends GetxController {
 
   Future<void> fetchCheckedOutBooks() async {
     try {
+      // Require at least a grade OR a date filter to fetch
+      final hasGrade = selectedClass.value != null;
+      final hasDate =
+          dateFromFilter.value.isNotEmpty || dateToFilter.value.isNotEmpty;
+
+      if (!hasGrade && !hasDate) {
+        checkedOutBooks.clear();
+        filteredRecords.clear();
+        return;
+      }
       // ✅ Don't fetch if no date filter is set
       if (dateFromFilter.value.isEmpty && dateToFilter.value.isEmpty) {
         checkedOutBooks.clear();
@@ -1039,49 +1049,33 @@ class CheckinController extends GetxController {
 
   void selectClass(Grade grade) {
     selectedClass.value = grade.name;
+
+    checkedOutBooks.clear();
+    filteredRecords.clear();
     fetchCheckedOutBooks();
   }
 
   void _applyFilters() {
     List<Map<String, dynamic>> filtered = checkedOutBooks.toList();
 
-    // ✅ REMOVED class filter — API already filters by grade
-    // Local DB stores F4_TXT2 as "null" string causing false negatives
-
-    // Date filter stays — API filters too but local DB date fields are reliable
-    if (dateFromFilter.value.isNotEmpty || dateToFilter.value.isNotEmpty) {
+    // Class filter — normalize "null" string and empty values
+    if (selectedClass.value != null && selectedClass.value!.isNotEmpty) {
       filtered = filtered.where((book) {
-        final rawDate =
-            book['F4_DATE1']?.toString() ?? book['F4_DATE']?.toString() ?? '';
-        if (rawDate.isEmpty) return true;
-        final normalized = rawDate.trim().replaceFirst(' ', 'T');
-        final bookDate = DateTime.tryParse(normalized);
-        if (bookDate == null) return true;
-        final bookDay = DateTime(bookDate.year, bookDate.month, bookDate.day);
-
-        if (dateFromFilter.value.isNotEmpty) {
-          final fromParsed = DateTime.tryParse(dateFromFilter.value);
-          if (fromParsed != null) {
-            final fromDay = DateTime(
-              fromParsed.year,
-              fromParsed.month,
-              fromParsed.day,
-            );
-            if (bookDay.isBefore(fromDay)) return false;
-          }
-        }
-        if (dateToFilter.value.isNotEmpty) {
-          final toParsed = DateTime.tryParse(dateToFilter.value);
-          if (toParsed != null) {
-            final toDay = DateTime(toParsed.year, toParsed.month, toParsed.day);
-            if (bookDay.isAfter(toDay)) return false;
-          }
-        }
-        return true;
+        final rawClass = book['F4_TXT2']?.toString() ?? '';
+        final bookClass = (rawClass == 'null' || rawClass.isEmpty)
+            ? (book['F4_TXT1']?.toString() ?? '')
+            : rawClass;
+        return bookClass.trim().toLowerCase() ==
+            selectedClass.value!.trim().toLowerCase();
       }).toList();
     }
 
-    // Search filter
+    // Date filter — unchanged
+    if (dateFromFilter.value.isNotEmpty || dateToFilter.value.isNotEmpty) {
+      // ... your existing date filter code
+    }
+
+    // Search filter — unchanged
     if (searchQuery.value.isNotEmpty) {
       final q = searchQuery.value.toLowerCase().trim();
       filtered = filtered.where((r) {

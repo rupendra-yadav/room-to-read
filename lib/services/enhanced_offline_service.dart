@@ -587,29 +587,31 @@ class EnhancedOfflineService extends GetxService {
     try {
       var filtered = books;
 
+      for (final b in books.take(5)) {
+        print(
+          'DEBUG CLASS -> F4_TXT2=${b['F4_TXT2']} | F4_TXT1=${b['F4_TXT1']} | className=${b['className']}',
+        );
+      }
+
       // Apply class filter
-      // if (className != null && className.isNotEmpty) {
-      //   filtered = filtered.where((b) {
-      //     print('   🔍 Book fields: ${b.keys.toList()}');
-      //     print(
-      //       '   F4_TXT2=${b['F4_TXT2']}, F4_TXT1=${b['F4_TXT1']}, className=${b['className']}',
-      //     );
+      if (className != null && className.isNotEmpty) {
+        filtered = filtered.where((b) {
+          final bookClass =
+              (b['F4_TXT2'] ??
+                      b['F4_TXT1'] ??
+                      b['className'] ??
+                      b['class'] ??
+                      '')
+                  .toString()
+                  .trim();
 
-      //     final bookClass =
-      //         b['F4_TXT2']?.toString() ??
-      //         b['F4_TXT1']?.toString() ??
-      //         b['className']?.toString() ??
-      //         b['class']?.toString() ??
-      //         '';
+          print('📚 Grade Filter: bookClass="$bookClass" filter="$className"');
 
-      //     print(
-      //       '   bookClass="$bookClass" vs filter="$className" → match=${bookClass.toLowerCase() == className.toLowerCase()}',
-      //     );
+          return bookClass == className;
+        }).toList();
 
-      //     return bookClass.isEmpty ||
-      //         bookClass.toLowerCase() == className.toLowerCase();
-      //   }).toList();
-      // }
+        print('📚 After grade filter: ${filtered.length}/${books.length}');
+      }
 
       // Apply search filter
       if (search != null && search.isNotEmpty) {

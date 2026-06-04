@@ -545,196 +545,29 @@ class CicoReportPage extends GetView<CicoReportController> {
                     SizedBox(height: isMobile ? 14 : 16),
                     // Book Issues List
                     Obx(() {
-                      final records =
-                          controller.filteredBookIssues.isEmpty &&
-                              controller.searchQuery.value.isEmpty
-                          ? controller.bookIssues
-                          : controller.filteredBookIssues;
+                      final records = controller.searchQuery.value.isNotEmpty
+                          ? controller.filteredBookIssues
+                          : controller.bookIssues;
 
-                      // Calculate statistics
-                      final totalRecords = (records as List).length;
-
-                      if (controller.filteredBookIssues.isEmpty &&
-                          controller.dateFromFilter.value.isEmpty &&
-                          controller.dateToFilter.value.isEmpty &&
-                          controller.selectedClass.value == null &&
-                          controller.searchQuery.value.isEmpty) {
-                        return Container(
-                          padding: EdgeInsets.all(isMobile ? 24 : 32),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.filter_alt_outlined,
-                                color: Colors.grey[400],
-                                size: 40,
-                              ),
-                              SizedBox(height: 12),
-                              Text(
-                                'ग्रेड, तिथि या नाम से फ़िल्टर करें',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: isMobile ? 13 : 14,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
+                      if (records.isEmpty) {
+                        return Center(
+                          child: Text(
+                            controller.selectedClass.value == null
+                                ? 'कृपया ग्रेड चुनें'
+                                : 'कोई रिकॉर्ड नहीं मिला',
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
                           ),
                         );
                       }
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Statistics Summary
-                          if (totalRecords > 0)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'CICO रिकॉर्ड ($totalRecords)',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 14 : 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                                // Export to Excel button
-                                GestureDetector(
-                                  onTap: () => _exportToExcel(
-                                    context,
-                                    records,
-                                    isMobile,
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[50],
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: Colors.green[300]!,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.file_download,
-                                          color: Colors.green[700],
-                                          size: 16,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Excel',
-                                          style: TextStyle(
-                                            color: Colors.green[700],
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                // Loading indicator for filtering
-                                Obx(() {
-                                  if (controller.isLoading.value) {
-                                    return Container(
-                                      padding: EdgeInsets.all(8),
-                                      child: SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                Colors.purple,
-                                              ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return SizedBox.shrink();
-                                }),
-                                // Refresh button
-                                GestureDetector(
-                                  onTap: () {
-                                    controller.fetchBookIssues();
-                                  },
-                                  child: Container(
-                                    padding: EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.purple[50],
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: Colors.purple[200]!,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.refresh,
-                                          color: Colors.purple[700],
-                                          size: 16,
-                                        ),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'रिफ्रेश',
-                                          style: TextStyle(
-                                            color: Colors.purple[700],
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                // Debug button
-                                // SizedBox(width: 8),
-                              ],
-                            ),
-                          SizedBox(height: isMobile ? 10 : 12),
-                          if (records.isEmpty)
-                            Container(
-                              padding: EdgeInsets.all(isMobile ? 16 : 20),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'कोई रिकॉर्ड नहीं मिला',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: isMobile ? 13 : 14,
-                                  ),
-                                ),
-                              ),
-                            )
-                          else
-                            ...records.map((record) {
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: isMobile ? 10 : 12,
-                                ),
-                                child: _buildBookIssueCard(record, isMobile),
-                              );
-                            }).toList(),
-                        ],
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: records.length,
+                        itemBuilder: (context, index) {
+                          final record = records[index];
+                          return _buildBookIssueCard(record, isMobile);
+                        },
                       );
                     }),
                   ],
