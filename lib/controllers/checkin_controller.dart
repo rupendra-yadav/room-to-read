@@ -182,11 +182,11 @@ class CheckinController extends GetxController {
         return;
       }
       // ✅ Don't fetch if no date filter is set
-      if (dateFromFilter.value.isEmpty && dateToFilter.value.isEmpty) {
-        checkedOutBooks.clear();
-        filteredRecords.clear();
-        return;
-      }
+      // if (dateFromFilter.value.isEmpty && dateToFilter.value.isEmpty) {
+      //   checkedOutBooks.clear();
+      //   filteredRecords.clear();
+      //   return;
+      // }
 
       isLoading.value = true;
       final user = _authService.currentUser.value;

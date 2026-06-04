@@ -607,7 +607,7 @@ class EnhancedOfflineService extends GetxService {
 
           print('📚 Grade Filter: bookClass="$bookClass" filter="$className"');
 
-          return bookClass == className;
+          return bookClass.contains(className);
         }).toList();
 
         print('📚 After grade filter: ${filtered.length}/${books.length}');

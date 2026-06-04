@@ -28,10 +28,10 @@ class OfflineDatabaseService extends GetxService {
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     print('🔄 Database upgrade: v$oldVersion → v$newVersion');
     if (oldVersion < 3) {
-  try {
-    // Recreate grades_cache with UNIQUE constraint
-    await db.execute('DROP TABLE IF EXISTS grades_cache');
-    await db.execute('''
+      try {
+        // Recreate grades_cache with UNIQUE constraint
+        await db.execute('DROP TABLE IF EXISTS grades_cache');
+        await db.execute('''
       CREATE TABLE grades_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         code TEXT NOT NULL UNIQUE,
@@ -39,11 +39,11 @@ class OfflineDatabaseService extends GetxService {
         cached_at TEXT NOT NULL
       )
     ''');
-    print('✅ Recreated grades_cache with UNIQUE constraint');
-  } catch (e) {
-    print('⚠️ Error upgrading grades_cache: $e');
-  }
-}
+        print('✅ Recreated grades_cache with UNIQUE constraint');
+      } catch (e) {
+        print('⚠️ Error upgrading grades_cache: $e');
+      }
+    }
 
     if (oldVersion < 2) {
       print(
@@ -1092,7 +1092,8 @@ class OfflineDatabaseService extends GetxService {
               book['F4_LCODE'] ??
               book['bookCode'] ??
               '', // ✅ NEW: Store F4_LCODE for display
-          'className': book['F4_TXT1'] ?? book['className'] ?? '',
+          'className':
+              book['F4_TXT2'] ?? book['F4_TXT1'] ?? book['className'] ?? '',
           'checkoutDate': book['F4_USERDT'] ?? book['checkoutDate'] ?? '',
           'dueDate': book['dueDate'] ?? '',
           'transactionCode': book['F4_BT'] ?? '1',
