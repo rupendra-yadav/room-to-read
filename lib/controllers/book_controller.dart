@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:room_to_read/models/book_model.dart' as book_model;
@@ -206,31 +208,41 @@ class BookController extends GetxController {
     }
   }
 
-  void searchBooks(String query) {
-    print('🔍 searchBooks called with query: "$query"');
-    print('   Current books count: ${books.length}');
-    print('   Current search query: "${searchQuery.value}"');
+  Timer? _debounce;
 
+  void searchBooks(String query) {
     searchQuery.value = query;
 
-    // Always apply filters, don't wait for load
-    if (books.isEmpty && query.isNotEmpty) {
-      print('⚠️ Books list is empty but search query provided ("$query")');
-      print('   Attempting to reload books...');
+    _debounce?.cancel();
 
-      // Reload in background without blocking UI
-      loadBooks()
-          .then((_) {
-            print('✅ Books reloaded after search. New count: ${books.length}');
-            applyFiltersAndSort();
-          })
-          .catchError((e) {
-            print('❌ Error reloading books: $e');
-            applyFiltersAndSort(); // Apply filters even if load failed
-          });
-    } else {
-      print('   Applying filters for query: "$query"');
+    if (query.isEmpty) {
       applyFiltersAndSort();
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _searchFromApi(query);
+    });
+  }
+
+  Future<void> _searchFromApi(String query) async {
+    try {
+      isLoading.value = true;
+      final currentUser = _authService.currentUser.value;
+      if (currentUser == null) return;
+
+      final bookList = await apiService.getBooks(
+        userId: currentUser.code,
+        search: query, // pass search to API
+      );
+
+      filteredBooks.value = bookList;
+    } catch (e) {
+      print('❌ Search API error: $e');
+      // fallback to local filter
+      applyFiltersAndSort();
+    } finally {
+      isLoading.value = false;
     }
   }
 

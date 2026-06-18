@@ -24,6 +24,10 @@ class StudentController extends GetxController {
   void onInit() {
     super.onInit();
     apiService = Get.find<HybridApiService>();
+    final connectivityService = Get.find<ConnectivityService>();
+    ever(connectivityService.isOnline, (bool isOnline) {
+      if (isOnline) syncPendingReadingLevelUpdates();
+    });
     loadStudents();
   }
 
@@ -302,6 +306,114 @@ class StudentController extends GetxController {
       Get.snackbar('त्रुटि', 'डेटा डाउनलोड में समस्या: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> updateReadingLevel(
+    String studentCode,
+    int oldLevel,
+    int newLevel,
+  ) async {
+    try {
+      final connectivityService = Get.find<ConnectivityService>();
+      final offlineDb = Get.find<OfflineDatabaseService>();
+
+      // Update UI immediately regardless of online/offline
+      final index = students.indexWhere((s) => s.code == studentCode);
+      if (index != -1) {
+        students[index] = students[index].copyWith(readingLevel: newLevel);
+        applyFilters();
+      }
+
+      if (connectivityService.isOnline.value) {
+        await _sendReadingLevelToApi(studentCode, newLevel);
+        print('✅ Reading level updated online for: $studentCode');
+      } else {
+        await offlineDb.saveOfflineReadingLevelUpdate(
+          studentCode: studentCode,
+          oldLevel: oldLevel,
+          newLevel: newLevel,
+        );
+        Get.snackbar(
+          'ऑफलाइन सेव',
+          'रीडिंग लेवल सेव हो गया। ऑनलाइन होने पर स्वचालित सिंक होगा।',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (e) {
+      print('❌ Error updating reading level: $e');
+      Get.snackbar('त्रुटि', 'लेवल अपडेट में समस्या: $e');
+    }
+  }
+
+  Future<void> _sendReadingLevelToApi(String studentCode, int newLevel) async {
+    try {
+      final apiService = Get.find<ApiService>();
+      final currentUser = _authService.currentUser.value;
+
+      // Replace with your actual API endpoint and params
+      final connect = GetConnect(timeout: const Duration(seconds: 30));
+      final formData = FormData({});
+      formData.fields.add(MapEntry('student_code', studentCode));
+      formData.fields.add(MapEntry('reading_level', newLevel.toString()));
+      if (currentUser != null) {
+        formData.fields.add(MapEntry('user_id', currentUser.code));
+      }
+
+      final response = await connect.post(
+        'YOUR_READING_LEVEL_API_ENDPOINT',
+        formData,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('API error: ${response.statusCode}');
+      }
+      print('✅ Reading level sent to API: $studentCode → $newLevel');
+    } catch (e) {
+      print('❌ Error sending reading level to API: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> syncPendingReadingLevelUpdates() async {
+    try {
+      final offlineDb = Get.find<OfflineDatabaseService>();
+      final pending = await offlineDb.getPendingReadingLevelUpdates();
+
+      if (pending.isEmpty) return;
+
+      print('🔄 Syncing ${pending.length} pending reading level updates...');
+      int successCount = 0;
+
+      for (final update in pending) {
+        try {
+          await _sendReadingLevelToApi(
+            update['student_code'],
+            update['new_level'],
+          );
+          await offlineDb.markReadingLevelUpdateSynced(update['id']);
+          successCount++;
+          print(
+            '✅ Synced: ${update['student_code']} → Level ${update['new_level']}',
+          );
+        } catch (e) {
+          print('❌ Failed to sync ${update['student_code']}: $e');
+          // Keeps sync_status = 0, retries next time online
+        }
+      }
+
+      if (successCount > 0) {
+        Get.snackbar(
+          'सिंक सफल',
+          '$successCount रीडिंग लेवल अपडेट सिंक हो गए',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('❌ Error syncing reading level updates: $e');
     }
   }
 }
