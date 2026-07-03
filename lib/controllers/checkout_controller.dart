@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:room_to_read/controllers/checkin_controller.dart';
 import 'package:room_to_read/controllers/student_controller.dart';
 import 'package:room_to_read/models/grade_model.dart';
+import 'package:room_to_read/models/student_model.dart';
 import 'package:room_to_read/services/hybrid_api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
 import 'package:room_to_read/services/offline_database_service.dart';
@@ -108,7 +109,42 @@ class CheckoutController extends GetxController {
   Future<void> _ensureStudentsLoaded() async {
     try {
       final studentController = Get.find<StudentController>();
-      if (studentController.students.isEmpty) {
+
+      if (studentController.students.isNotEmpty) return;
+
+      if (!_connectivityService.isOnline.value) {
+        // ✅ Offline: load directly from offline DB, skip API
+        print('📱 Offline mode: Loading students from offline DB...');
+        final offlineDb = Get.find<OfflineDatabaseService>();
+        final currentUser = _authService.currentUser.value;
+        final offlineStudents = await offlineDb.getStudentsOffline(
+          teacherId: currentUser?.code,
+        );
+
+        if (offlineStudents.isNotEmpty) {
+          studentController.students.value = offlineStudents.map((data) {
+            return Student(
+              id: data['id'] ?? '',
+              code: data['code'] ?? '',
+              name: data['name'] ?? '',
+              className: data['className'] ?? '',
+              readingLevel: data['readingLevel'] ?? 0,
+              currentLevel: data['currentLevel'] ?? 0,
+              booksIssued: data['booksIssued'] ?? 0,
+              lastUpdated:
+                  DateTime.tryParse(data['lastUpdated'] ?? '') ??
+                  DateTime.now(),
+              previousLevel: data['previousLevel'] ?? 0,
+              teacherId: data['teacherId'] ?? '',
+            );
+          }).toList();
+          studentController.filteredStudents.value = studentController.students
+              .toList();
+          print('✅ Loaded ${offlineStudents.length} students from offline DB');
+        } else {
+          print('⚠️ No students found in offline DB');
+        }
+      } else {
         await studentController.loadStudents();
       }
     } catch (e) {
@@ -391,82 +427,92 @@ class CheckoutController extends GetxController {
         };
       }
 
-      // ✅ FIXED: Check availability for EACH book in the list
-      for (final book in selectedBooks) {
-        final available = await _checkBookAvailabilityFromDatabase(book.bookId);
-        if (available <= 0) {
-          return {
-            'success': false,
-            'message':
-                '"${book.title}" उपलब्ध नहीं है। उपलब्ध प्रतियां: $available',
-          };
+      // ✅ Skip availability check in offline mode — cached counts may be stale
+      if (_connectivityService.isOnline.value) {
+        for (final book in selectedBooks) {
+          final available = await _checkBookAvailabilityFromDatabase(
+            book.bookId,
+          );
+          if (available <= 0) {
+            return {
+              'success': false,
+              'message':
+                  '"${book.title}" उपलब्ध नहीं है। उपलब्ध प्रतियां: $available',
+            };
+          }
+          print(
+            '📚 Book "${book.title}" availability check passed: $available copies',
+          );
         }
-        print(
-          '📚 Book "${book.title}" availability check passed: $available copies',
-        );
+      } else {
+        print('📱 Offline: skipping strict availability check');
       }
 
-      // ✅ FIXED: Duplicate check for EACH book in the list
-      print('🔍 Comprehensive duplicate check before API call...');
-      try {
-        final checkedOutBooks = await apiService.getCheckedOutBooks(
-          teacherId: teacherId,
-        );
+      // ✅ Skip online duplicate check in offline mode
+      if (_connectivityService.isOnline.value) {
+        print('🔍 Comprehensive duplicate check before API call...');
+        try {
+          final checkedOutBooks = await apiService.getCheckedOutBooks(
+            teacherId: teacherId,
+          );
 
-        for (final book in selectedBooks) {
-          for (final checkedOutBook in checkedOutBooks) {
-            final existingBookCode =
-                checkedOutBook['F4_LCODE']?.toString() ?? '';
-            final existingBookId = checkedOutBook['bookId']?.toString() ?? '';
-            final existingStudentId =
-                checkedOutBook['F4_PARTY1']?.toString() ?? '';
-            final existingStudentName =
-                checkedOutBook['F4_PARTY1N']?.toString() ?? '';
+          for (final book in selectedBooks) {
+            for (final checkedOutBook in checkedOutBooks) {
+              final existingBookCode =
+                  checkedOutBook['F4_LCODE']?.toString() ?? '';
+              final existingBookId = checkedOutBook['bookId']?.toString() ?? '';
+              final existingStudentId =
+                  checkedOutBook['F4_PARTY1']?.toString() ?? '';
+              final existingStudentName =
+                  checkedOutBook['F4_PARTY1N']?.toString() ?? '';
 
-            final bookMatch =
-                (existingBookCode == book.bookCode ||
-                existingBookCode == book.bookId ||
-                existingBookId == book.bookCode ||
-                existingBookId == book.bookId);
+              final bookMatch =
+                  (existingBookCode == book.bookCode ||
+                  existingBookCode == book.bookId ||
+                  existingBookId == book.bookCode ||
+                  existingBookId == book.bookId);
 
-            final studentMatch =
-                existingStudentId == studentId ||
-                existingStudentName.toLowerCase().trim() ==
-                    student.name.toLowerCase().trim();
+              final studentMatch =
+                  existingStudentId == studentId ||
+                  existingStudentName.toLowerCase().trim() ==
+                      student.name.toLowerCase().trim();
 
-            if (bookMatch && studentMatch) {
-              print(
-                '🚫 Duplicate found: "${book.title}" already issued to "${student.name}"',
-              );
-              Get.snackbar(
-                'डुप्लिकेट चेकआउट',
-                '"${book.title}" यह छात्र को पहले से जारी है।',
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-                duration: const Duration(seconds: 4),
-              );
-              return {
-                'success': false,
-                'message':
-                    'Student already has book "${book.title}" - detected before API call',
-              };
+              if (bookMatch && studentMatch) {
+                print(
+                  '🚫 Duplicate found: "${book.title}" already issued to "${student.name}"',
+                );
+                Get.snackbar(
+                  'डुप्लिकेट चेकआउट',
+                  '"${book.title}" यह छात्र को पहले से जारी है।',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 4),
+                );
+                return {
+                  'success': false,
+                  'message':
+                      'Student already has book "${book.title}" - detected before API call',
+                };
+              }
             }
           }
+        } catch (e) {
+          print('⚠️ Duplicate check failed: $e');
         }
-      } catch (e) {
-        print('⚠️ Duplicate check failed: $e');
+      } else {
+        print('📱 Offline: skipping online duplicate check');
       }
 
-      // ✅ FIXED: Offline duplicate check for EACH book
+      // ✅ Offline duplicate check for EACH book (always runs)
       try {
         final offlineDb = Get.find<OfflineDatabaseService>();
         final db = await offlineDb.database;
 
         for (final book in selectedBooks) {
           final recentTransactions = await db.query(
-            'offline_transactions',
+            'offline_transactions_enhanced',
             where:
-                'teacherId = ? AND type = ? AND synced = ? AND bookId = ? AND studentId = ?',
+                'teacher_id = ? AND transaction_type = ? AND sync_status = ? AND book_id = ? AND student_id = ?',
             whereArgs: [teacherId, 'checkout', 0, book.bookId, studentId],
           );
 
@@ -492,7 +538,7 @@ class CheckoutController extends GetxController {
         print('⚠️ Offline duplicate check failed: $e - proceeding');
       }
 
-      // ✅ FIXED: Build booksArray from selectedBooks list
+      // Build booksArray from selectedBooks list
       final List<Map<String, dynamic>> booksArray = selectedBooks.map((book) {
         return {
           'bookId': book.bookId,
@@ -514,21 +560,70 @@ class CheckoutController extends GetxController {
       }
       print('======================================================\n');
 
-      final result = await apiService.checkout(
-        teacherId: teacherId,
-        books: booksArray,
-        studentId: studentId,
-        className: className,
-        programId: programId,
-        schoolId: schoolId,
-        studentName: student.name,
-      );
+      Map<String, dynamic> result;
+
+      if (!_connectivityService.isOnline.value) {
+        // ✅ Offline: save each book as individual offline transaction
+        print(
+          '📱 Offline mode: Saving ${selectedBooks.length} books offline...',
+        );
+        final offlineDb = Get.find<OfflineDatabaseService>();
+        int savedCount = 0;
+
+        for (final book in selectedBooks) {
+          try {
+            final resolvedBookId = book.bookId.isNotEmpty
+                ? book.bookId
+                : book.bookCode;
+
+            await offlineDb.saveOfflineCheckout(
+              teacherId: teacherId,
+              bookId: resolvedBookId,
+              bookCode: book.bookCode,
+              studentId: studentId,
+              className: className,
+              studentName: student.name,
+              bookName: book.title,
+            );
+            savedCount++;
+            print('✅ Saved offline checkout: ${book.title}');
+          } catch (e) {
+            print('❌ Failed to save offline checkout for ${book.title}: $e');
+          }
+        }
+
+        if (savedCount == selectedBooks.length) {
+          result = {
+            'success': true,
+            'message':
+                '$savedCount किताबें ऑफलाइन सेव हो गईं। ऑनलाइन होने पर सिंक होंगी।',
+            'offline': true,
+          };
+        } else {
+          result = {
+            'success': savedCount > 0,
+            'message':
+                '$savedCount/${selectedBooks.length} किताबें ऑफलाइन सेव हो सकीं।',
+            'offline': true,
+          };
+        }
+      } else {
+        // ✅ Online: API call
+        result = await apiService.checkout(
+          teacherId: teacherId,
+          books: booksArray,
+          studentId: studentId,
+          className: className,
+          programId: programId,
+          schoolId: schoolId,
+          studentName: student.name,
+        );
+      }
 
       if (result['success'] == true) {
-        print('\n✅ CHECKOUT SUCCESS - API RESPONSE:');
+        print('\n✅ CHECKOUT SUCCESS');
         print('   Full Result: ${jsonEncode(result)}');
 
-        // ✅ FIXED: Add ALL books to local history
         for (final book in selectedBooks) {
           checkoutHistory.add({
             'student': student,
@@ -540,32 +635,34 @@ class CheckoutController extends GetxController {
           print('✅ Added to history: "${book.title}" for "${student.name}"');
         }
 
-        // Refresh book data
-        try {
-          await Future.delayed(const Duration(milliseconds: 800));
-          final bookController = Get.find<BookController>();
-          await bookController.loadBooks();
-          print('✅ BookController refreshed');
-        } catch (e) {
-          print('⚠️ Failed to refresh BookController: $e');
-        }
-
-        try {
-          final homeController = Get.find<HomeController>();
-          await homeController.refreshCounts();
-        } catch (e) {
-          print('⚠️ Failed to refresh HomeController: $e');
-        }
-
-        try {
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (Get.isRegistered<CheckinController>()) {
-            final checkinController = Get.find<CheckinController>();
-            await checkinController.refreshCheckedOutBooks();
-            print('✅ CheckinController refreshed');
+        // Refresh controllers only when online
+        if (_connectivityService.isOnline.value) {
+          try {
+            await Future.delayed(const Duration(milliseconds: 800));
+            final bookController = Get.find<BookController>();
+            await bookController.loadBooks();
+            print('✅ BookController refreshed');
+          } catch (e) {
+            print('⚠️ Failed to refresh BookController: $e');
           }
-        } catch (e) {
-          print('❌ Error refreshing CheckinController: $e');
+
+          try {
+            final homeController = Get.find<HomeController>();
+            await homeController.refreshCounts();
+          } catch (e) {
+            print('⚠️ Failed to refresh HomeController: $e');
+          }
+
+          try {
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (Get.isRegistered<CheckinController>()) {
+              final checkinController = Get.find<CheckinController>();
+              await checkinController.refreshCheckedOutBooks();
+              print('✅ CheckinController refreshed');
+            }
+          } catch (e) {
+            print('❌ Error refreshing CheckinController: $e');
+          }
         }
 
         clearSelection();

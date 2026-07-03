@@ -409,11 +409,12 @@ class ApiService extends GetxService {
         );
       }
       log('📤 CHECKOUT: Sending to ${ApiConfig.checkoutUrl}');
+      log('📋 CHECKOUT: teacherId: $teacherId');
       log('📋 CHECKOUT: programId: $finalProgramId');
       log('📋 CHECKOUT: schoolId: $finalSchoolId');
-      log('📋 CHECKOUT: teacherId: $teacherId');
-      log('📋 CHECKOUT: className: $className');
-      log('📋 CHECKOUT: studentId: $studentId');
+      log('📋 CHECKOUT: grade: $className');
+      log('📋 CHECKOUT: m1Group: $finalProgramId');
+      log('📋 CHECKOUT: m1Group1: $finalSchoolId');
       log('📋 CHECKOUT: Form data: $books');
 
       final response = await GetConnect().post(ApiConfig.checkoutUrl, formData);
@@ -471,8 +472,8 @@ class ApiService extends GetxService {
 
       // Use fallback values from current user if not provided
       // ✅ FIXED: Use group (M1_GROUP) for school_id and group1 (M1_GROUP1) for program_id
-      final finalSchoolId = schoolId ?? currentUser.group1; // M1_GROUP = 2014
-      final finalProgramId = programId ?? currentUser.group; // M1_GROUP1 = 3898
+      final finalSchoolId = schoolId ?? currentUser.group1;
+      final finalProgramId = programId ?? currentUser.group;
       final finalTeacherId = teacherId;
 
       // ✅ CHECK CONNECTIVITY FIRST

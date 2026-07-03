@@ -606,6 +606,65 @@ class CicoReportPage extends GetView<CicoReportController> {
                       return const SizedBox.shrink();
                     }),
                     SizedBox(height: isMobile ? 14 : 16),
+                    // Total count + Export button row
+                    Obx(() {
+                      final records = controller.searchQuery.value.isNotEmpty
+                          ? controller.filteredBookIssues
+                          : controller.bookIssues;
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'कुल रिकॉर्ड: ${records.length}',
+                            style: TextStyle(
+                              fontSize: isMobile ? 14 : 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          if (records.isNotEmpty)
+                            GestureDetector(
+                              onTap: () =>
+                                  _exportToExcel(context, records, isMobile),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isMobile ? 12 : 14,
+                                  vertical: isMobile ? 8 : 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.green,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.download,
+                                      color: Colors.green,
+                                      size: isMobile ? 16 : 18,
+                                    ),
+                                    SizedBox(width: isMobile ? 6 : 8),
+                                    Text(
+                                      'Excel',
+                                      style: TextStyle(
+                                        color: Colors.green,
+                                        fontSize: isMobile ? 12 : 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    }),
+                    SizedBox(height: isMobile ? 10 : 12),
                     // Book Issues List
                     Obx(() {
                       final records = controller.searchQuery.value.isNotEmpty
@@ -629,7 +688,7 @@ class CicoReportPage extends GetView<CicoReportController> {
                         itemCount: records.length,
                         itemBuilder: (context, index) {
                           final record = records[index];
-                          return _buildBookIssueCard(record, isMobile);
+                          return buildBookIssueCard(record, isMobile);
                         },
                       );
                     }),
@@ -643,7 +702,7 @@ class CicoReportPage extends GetView<CicoReportController> {
     );
   }
 
-  Widget _buildBookIssueCard(Map<String, dynamic> record, bool isMobile) {
+  Widget buildBookIssueCard(Map<String, dynamic> record, bool isMobile) {
     // Determine the status based on F4_BT value
     String status = 'जारी';
     Color statusColor = Colors.blue;

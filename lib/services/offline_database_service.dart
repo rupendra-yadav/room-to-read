@@ -971,6 +971,10 @@ class OfflineDatabaseService extends GetxService {
       final transactions = await db.rawQuery(
         'SELECT COUNT(*) as count FROM offline_transactions_enhanced WHERE sync_status = 0',
       );
+      final readingUpdates = await db.rawQuery(
+        // ← added
+        'SELECT COUNT(*) as count FROM reading_level_updates WHERE sync_status = 0',
+      );
 
       return {
         'students': (students.first['count'] as int?) ?? 0,
@@ -978,7 +982,8 @@ class OfflineDatabaseService extends GetxService {
         'classes': (classes.first['count'] as int?) ?? 0,
         'checkedOutBooks': (checkedOut.first['count'] as int?) ?? 0,
         'pendingTransactions': (transactions.first['count'] as int?) ?? 0,
-        'pendingReadingLevelUpdates': 0,
+        'pendingReadingLevelUpdates': // ← replaced 0
+            (readingUpdates.first['count'] as int?) ?? 0,
       };
     } catch (e) {
       print('❌ Error getting offline stats: $e');
@@ -1217,23 +1222,27 @@ class OfflineDatabaseService extends GetxService {
       // Now save the fresh data from API
       for (final book in books) {
         await db.insert('checked_out_books', {
-          'id': book['id'] ?? '${book['F4_LCODE']}_${book['F4_PARTY1N']}',
-          'teacherId': book['teacherId'] ?? book['F4_USERADD'] ?? '',
+          'id':
+              book['F4_LCODE'] ??
+              '${book['F4_PARTY_NO']}_${book['F4_PARTY1N']}',
+          'teacherId': book['F4_USERADD'] ?? book['teacherId'] ?? '',
           'studentId': book['studentId'] ?? '',
           'studentName': book['F4_PARTY1N'] ?? book['studentName'] ?? '',
           'bookId': book['bookId'] ?? '',
           'bookName': book['F4_PARTYN'] ?? book['bookName'] ?? '',
-          'bookCode': book['F4_LCODE'] ?? book['bookCode'] ?? '',
-          'F4_LCODE':
-              book['F4_LCODE'] ??
-              book['bookCode'] ??
-              '', // ✅ NEW: Store F4_LCODE for display
+          'bookCode':
+              book['F4_PARTY_NO'] ?? book['bookCode'] ?? '', // ✅ real book code
+          'F4_LCODE': book['F4_LCODE'] ?? '', // ✅ transaction number
           'className':
               book['F4_TXT2'] ?? book['F4_TXT1'] ?? book['className'] ?? '',
-          'checkoutDate': book['F4_USERDT'] ?? book['checkoutDate'] ?? '',
+          'checkoutDate':
+              book['F4_DATE1'] ??
+              book['F4_USERDT'] ??
+              book['checkoutDate'] ??
+              '',
           'dueDate': book['dueDate'] ?? '',
           'transactionCode': book['F4_BT'] ?? '1',
-          'synced': 1, // ✅ CRITICAL: Mark as synced=1 (from API, not offline)
+          'synced': 1,
           'rawData': jsonEncode(book),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
@@ -1514,6 +1523,51 @@ class OfflineDatabaseService extends GetxService {
       print('✅ Marked checkout as synced: $transactionId');
     } catch (e) {
       print('❌ Error marking checkout as synced: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingReadingLevelUpdates() async {
+    try {
+      final db = await database;
+      return await db.query(
+        'reading_level_updates',
+        where: 'sync_status = ?',
+        whereArgs: [0],
+      );
+    } catch (e) {
+      print('❌ Error getting pending reading level updates: $e');
+      return [];
+    }
+  }
+
+  Future<void> markReadingLevelUpdateSynced(int id) async {
+    try {
+      final db = await database;
+      await db.update(
+        'reading_level_updates',
+        {'sync_status': 1, 'updated_at': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      print('✅ Marked reading level update as synced: $id');
+    } catch (e) {
+      print('❌ Error marking reading level update as synced: $e');
+    }
+  }
+
+  Future<bool> hasPendingReadingLevelUpdate(String studentCode) async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        'reading_level_updates',
+        where: 'student_code = ? AND sync_status = ?',
+        whereArgs: [studentCode, 0],
+        limit: 1,
+      );
+      return result.isNotEmpty;
+    } catch (e) {
+      print('❌ Error checking pending reading level update: $e');
+      return false;
     }
   }
 }

@@ -52,4 +52,30 @@ class Student {
     );
     return student;
   }
+
+  Student copyWith({
+  String? id,
+  String? code,
+  String? name,
+  String? className,
+  int? readingLevel,
+  int? currentLevel,
+  int? booksIssued,
+  DateTime? lastUpdated,
+  int? previousLevel,
+  String? teacherId,
+}) {
+  return Student(
+    id: id ?? this.id,
+    code: code ?? this.code,
+    name: name ?? this.name,
+    className: className ?? this.className,
+    readingLevel: readingLevel ?? this.readingLevel,
+    currentLevel: currentLevel ?? this.currentLevel,
+    booksIssued: booksIssued ?? this.booksIssued,
+    lastUpdated: lastUpdated ?? this.lastUpdated,
+    previousLevel: previousLevel ?? this.previousLevel,
+    teacherId: teacherId ?? this.teacherId,
+  );
+}
 }

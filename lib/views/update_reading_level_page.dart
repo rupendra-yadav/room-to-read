@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/models/student_model.dart';
+import 'package:room_to_read/services/offline_database_service.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
 
 class UpdateReadingLevelPage extends StatefulWidget {
@@ -17,6 +18,7 @@ class _UpdateReadingLevelPageState extends State<UpdateReadingLevelPage> {
   late TextEditingController levelController;
   late DateTime selectedDate;
   late int selectedLevel;
+  bool _hasPendingUpdate = false;
 
   @override
   void initState() {
@@ -26,6 +28,15 @@ class _UpdateReadingLevelPageState extends State<UpdateReadingLevelPage> {
     );
     selectedLevel = widget.student.readingLevel;
     selectedDate = DateTime.now();
+    _checkPendingUpdate();
+  }
+
+  Future<void> _checkPendingUpdate() async {
+    final offlineDb = Get.find<OfflineDatabaseService>();
+    final hasPending = await offlineDb.hasPendingReadingLevelUpdate(
+      widget.student.code,
+    );
+    setState(() => _hasPendingUpdate = hasPending);
   }
 
   @override
@@ -215,6 +226,40 @@ class _UpdateReadingLevelPageState extends State<UpdateReadingLevelPage> {
                       },
                     ),
 
+                    SizedBox(height: isMobile ? 12 : 14),
+                    if (_hasPendingUpdate)
+                      Container(
+                        margin: EdgeInsets.only(top: isMobile ? 10 : 12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isMobile ? 12 : 14,
+                          vertical: isMobile ? 8 : 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange[300]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.sync,
+                              color: Colors.orange[700],
+                              size: isMobile ? 16 : 18,
+                            ),
+                            SizedBox(width: isMobile ? 8 : 10),
+                            Expanded(
+                              child: Text(
+                                'ऑफलाइन अपडेट पेंडिंग — ऑनलाइन होने पर सिंक होगा',
+                                style: TextStyle(
+                                  color: Colors.orange[700],
+                                  fontSize: isMobile ? 12 : 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     SizedBox(height: isMobile ? 12 : 14),
                     // Level Change Info
                     Container(
