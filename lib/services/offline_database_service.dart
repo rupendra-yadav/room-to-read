@@ -873,8 +873,11 @@ class OfflineDatabaseService extends GetxService {
 
       for (final r in records) {
         final id =
-            r['id']?.toString() ??
-            '${r['F4_LCODE'] ?? r['bookCode']}_${r['F4_PARTY1'] ?? r['studentId']}_${r['F4_USERDT'] ?? r['transactionDate'] ?? DateTime.now().millisecondsSinceEpoch}';
+            '${teacherId}_'
+            '${r['F4_LCODE']}_'
+            '${r['F4_PARTY1']}_'
+            '${r['F4_BT']}_'
+            '${r['F4_USERDT']}';
 
         await db.insert('cico_report_cache', {
           'id': id,
@@ -926,10 +929,33 @@ class OfflineDatabaseService extends GetxService {
       );
 
       // Date filtering done in Dart since dates come in mixed formats
-      return rows.where((r) {
+      // return rows.where((r) {
+      //   final dateStr = r['transactionDate']?.toString() ?? '';
+      //   final date = DateTime.tryParse(dateStr.replaceFirst(' ', 'T'));
+      //   if (date == null) return true;
+      //   if (fromDate != null && fromDate.isNotEmpty) {
+      //     final from = DateTime.tryParse(fromDate);
+      //     if (from != null &&
+      //         date.isBefore(DateTime(from.year, from.month, from.day))) {
+      //       return false;
+      //     }
+      //   }
+      //   if (toDate != null && toDate.isNotEmpty) {
+      //     final to = DateTime.tryParse(toDate);
+      //     if (to != null &&
+      //         date.isAfter(DateTime(to.year, to.month, to.day, 23, 59, 59))) {
+      //       return false;
+      //     }
+      //   }
+      //   return true;
+      // }).toList();
+
+      final filtered = rows.where((r) {
         final dateStr = r['transactionDate']?.toString() ?? '';
         final date = DateTime.tryParse(dateStr.replaceFirst(' ', 'T'));
+
         if (date == null) return true;
+
         if (fromDate != null && fromDate.isNotEmpty) {
           final from = DateTime.tryParse(fromDate);
           if (from != null &&
@@ -937,6 +963,7 @@ class OfflineDatabaseService extends GetxService {
             return false;
           }
         }
+
         if (toDate != null && toDate.isNotEmpty) {
           final to = DateTime.tryParse(toDate);
           if (to != null &&
@@ -944,7 +971,27 @@ class OfflineDatabaseService extends GetxService {
             return false;
           }
         }
+
         return true;
+      }).toList();
+
+      return filtered.map((row) {
+        try {
+          final raw = row['rawData'];
+
+          if (raw != null && raw.toString().isNotEmpty) {
+            final decoded = Map<String, dynamic>.from(
+              jsonDecode(raw.toString()),
+            );
+
+            // Keep DB fields but overwrite/add all API fields
+            return {...row, ...decoded};
+          }
+        } catch (e) {
+          print('Failed to decode rawData: $e');
+        }
+
+        return Map<String, dynamic>.from(row);
       }).toList();
     } catch (e) {
       print('❌ Error reading CICO report cache: $e');

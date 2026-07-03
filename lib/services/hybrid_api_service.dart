@@ -844,7 +844,7 @@ class HybridApiService extends GetxService {
       }
     }
 
-    // Offline: derive summary + a simple daily chart from cached CICO rows
+    // Offline: derive summary + chart from cached CICO rows
     final rows = await _offlineDb.getCicoReportOffline(
       teacherId: teacherId ?? '',
       className: className,
@@ -852,20 +852,63 @@ class HybridApiService extends GetxService {
       toDate: dateTo,
     );
 
-    int checkouts = 0, checkins = 0;
-    final Map<String, int> byDay = {};
+    int checkouts = 0;
+    int checkins = 0;
+
+    final Map<String, int> byPeriod = {};
+    final List<Map<String, dynamic>> reportList = [];
 
     for (final r in rows) {
-      final type = r['transactionType'];
-      if (type == 'checkout') {
+      // Transaction type from API
+      final bt = (r['F4_BT'] ?? '').toString();
+
+      if (bt == '1') {
         checkouts++;
       } else {
         checkins++;
       }
-      final day = (r['transactionDate']?.toString() ?? '').split('T').first;
-      if (day.isNotEmpty) {
-        byDay[day] = (byDay[day] ?? 0) + 1;
+
+      // Use update date for chart grouping
+      final dateStr = (r['F4_USERDT'] ?? r['transactionDate'] ?? '').toString();
+
+      if (dateStr.isNotEmpty) {
+        final dt = DateTime.tryParse(dateStr.replaceFirst(' ', 'T'));
+
+        if (dt != null) {
+          String key;
+
+          switch (aggregation) {
+            case 'daily':
+              key =
+                  '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+              break;
+
+            case 'weekly':
+              final week = ((dt.day - 1) ~/ 7) + 1;
+              key = '${dt.year}-${dt.month}-W$week';
+              break;
+
+            case 'yearly':
+              key = '${dt.year}';
+              break;
+
+            case 'monthly':
+            default:
+              key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+          }
+
+          byPeriod[key] = (byPeriod[key] ?? 0) + 1;
+        }
       }
+
+      // Convert API row into UI format
+      reportList.add({
+        'student_name': r['F4_PARTY1N'] ?? '',
+        'book_name': r['F4_PARTYN'] ?? '',
+        'F4_BT': r['F4_BT'] ?? bt,
+        'F4_DATE1': r['F4_DATE1'] ?? r['F4_DATE'] ?? '',
+        'F4_DATE2': r['F4_DATE2'] ?? '',
+      });
     }
 
     return {
@@ -876,8 +919,8 @@ class HybridApiService extends GetxService {
         'totalCheckins': checkins,
         'totalTransactions': rows.length,
       },
-      'chart': byDay,
-      'list': rows,
+      'chart': byPeriod,
+      'list': reportList,
     };
   }
 
