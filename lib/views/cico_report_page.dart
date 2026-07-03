@@ -13,11 +13,48 @@ class CicoReportPage extends GetView<CicoReportController> {
   const CicoReportPage({Key? key}) : super(key: key);
 
   Future<void> _selectDate(BuildContext context, bool isFromDate) async {
+    // Parse existing dates to set appropriate constraints
+    DateTime? existingFromDate;
+    DateTime? existingToDate;
+
+    try {
+      if (controller.dateFromFilter.value.isNotEmpty) {
+        existingFromDate = DateTime.parse(controller.dateFromFilter.value);
+      }
+      if (controller.dateToFilter.value.isNotEmpty) {
+        existingToDate = DateTime.parse(controller.dateToFilter.value);
+      }
+    } catch (e) {
+      // If parsing fails, just ignore and use defaults
+    }
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
+      // Set dynamic firstDate/lastDate based on which date is being selected
+      selectableDayPredicate: isFromDate
+          ? (DateTime day) {
+              // For fromDate: can't be after toDate
+              if (existingToDate != null) {
+                return day.isBefore(existingToDate) ||
+                    (day.year == existingToDate.year &&
+                        day.month == existingToDate.month &&
+                        day.day == existingToDate.day);
+              }
+              return true;
+            }
+          : (DateTime day) {
+              // For toDate: can't be before fromDate
+              if (existingFromDate != null) {
+                return day.isAfter(existingFromDate) ||
+                    (day.year == existingFromDate.year &&
+                        day.month == existingFromDate.month &&
+                        day.day == existingFromDate.day);
+              }
+              return true;
+            },
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -31,12 +68,38 @@ class CicoReportPage extends GetView<CicoReportController> {
         );
       },
     );
+
     if (picked != null) {
       final formattedDate =
           '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+
       if (isFromDate) {
+        // Check if fromDate <= toDate
+        if (existingToDate != null && picked.isAfter(existingToDate)) {
+          Get.snackbar(
+            'अमान्य तारीख',
+            'प्रारंभ तारीख अंत तारीख से पहले होनी चाहिए',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 2),
+          );
+          return;
+        }
         controller.setDateFilter(formattedDate, controller.dateToFilter.value);
       } else {
+        // Check if toDate >= fromDate
+        if (existingFromDate != null && picked.isBefore(existingFromDate)) {
+          Get.snackbar(
+            'अमान्य तारीख',
+            'अंत तारीख प्रारंभ तारीख के बाद होनी चाहिए',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 2),
+          );
+          return;
+        }
         controller.setDateFilter(
           controller.dateFromFilter.value,
           formattedDate,
@@ -616,6 +679,7 @@ class CicoReportPage extends GetView<CicoReportController> {
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 14),
+      margin: EdgeInsets.only(bottom: 2),
       decoration: BoxDecoration(
         color: Colors.purple[50],
         borderRadius: BorderRadius.circular(8),

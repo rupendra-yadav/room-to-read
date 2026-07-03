@@ -275,8 +275,28 @@ class CheckinPage extends GetView<CheckinController> {
                                             },
                                           );
                                           if (picked != null) {
+                                            final pickedStr =
+                                                '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+
+                                            // If new 'from' date is after current 'to' date, clear 'to'
+                                            final currentTo =
+                                                controller.dateToFilter.value;
+                                            if (currentTo.isNotEmpty) {
+                                              final toDate = DateTime.tryParse(
+                                                currentTo,
+                                              );
+                                              if (toDate != null &&
+                                                  picked.isAfter(toDate)) {
+                                                controller.setDateFilter(
+                                                  pickedStr,
+                                                  '',
+                                                ); // Clear 'to'
+                                                return;
+                                              }
+                                            }
+
                                             controller.setDateFilter(
-                                              '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}',
+                                              pickedStr,
                                               controller.dateToFilter.value,
                                             );
                                           }
@@ -355,8 +375,28 @@ class CheckinPage extends GetView<CheckinController> {
                                           final DateTime?
                                           picked = await showDatePicker(
                                             context: context,
-                                            initialDate: DateTime.now(),
-                                            firstDate: DateTime(2020),
+                                            initialDate:
+                                                controller
+                                                    .dateFromFilter
+                                                    .value
+                                                    .isNotEmpty
+                                                ? DateTime.parse(
+                                                    controller
+                                                        .dateFromFilter
+                                                        .value,
+                                                  )
+                                                : DateTime.now(),
+                                            firstDate:
+                                                controller
+                                                    .dateFromFilter
+                                                    .value
+                                                    .isNotEmpty
+                                                ? DateTime.parse(
+                                                    controller
+                                                        .dateFromFilter
+                                                        .value,
+                                                  )
+                                                : DateTime(2020),
                                             lastDate: DateTime.now(),
                                             builder: (context, child) {
                                               return Theme(

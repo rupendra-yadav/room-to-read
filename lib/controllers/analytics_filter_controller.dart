@@ -118,29 +118,24 @@ class AnalyticsFilterController extends GetxController {
   }
 
   Future<void> selectFromDate(BuildContext context) async {
+    DateTime lastDate = DateTime.now();
+
+    if (toDate.value.isNotEmpty) {
+      lastDate = DateTime.parse(toDate.value);
+    }
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: lastDate.isBefore(DateTime.now())
+          ? lastDate
+          : DateTime.now(),
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: lastDate,
     );
 
     if (picked != null) {
       fromDate.value = DateFormat('yyyy-MM-dd').format(picked);
       print('Selected from date: ${fromDate.value}');
-
-      if (toDate.value.isNotEmpty) {
-        final toDateTime = DateTime.parse(toDate.value);
-        if (toDateTime.isBefore(picked)) {
-          toDate.value = '';
-          Get.snackbar(
-            'तारीख त्रुटि',
-            'समाप्ति तारीख प्रारंभ तारीख के बाद होनी चाहिए',
-            backgroundColor: Colors.orange,
-            colorText: Colors.white,
-          );
-        }
-      }
       _updateFilterValidity();
     }
   }
@@ -199,22 +194,6 @@ class AnalyticsFilterController extends GetxController {
         icon: const Icon(Icons.warning, color: Colors.white),
       );
       return;
-    }
-
-    if (fromDate.value.isNotEmpty && toDate.value.isNotEmpty) {
-      final fromDateTime = DateTime.parse(fromDate.value);
-      final toDateTime = DateTime.parse(toDate.value);
-
-      if (toDateTime.isBefore(fromDateTime)) {
-        Get.snackbar(
-          'तारीख त्रुटि',
-          'समाप्ति तारीख प्रारंभ तारीख के बाद होनी चाहिए',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          icon: const Icon(Icons.error, color: Colors.white),
-        );
-        return;
-      }
     }
 
     final currentUser = _authService.currentUser.value;

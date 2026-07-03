@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:room_to_read/models/grade_model.dart';
+import 'package:room_to_read/services/connectivity_service.dart';
 import 'package:room_to_read/services/hybrid_api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
 
@@ -19,6 +20,10 @@ class CicoReportController extends GetxController {
   var grades = <Grade>[].obs;
   var isLoading = false.obs;
   int _requestId = 0;
+  final ConnectivityService _connectivityService =
+      Get.find<ConnectivityService>();
+
+  var isOfflineData = false.obs;
 
   final TextEditingController searchController = TextEditingController();
 
@@ -75,6 +80,9 @@ class CicoReportController extends GetxController {
     try {
       isLoading.value = true;
 
+      // ✅ Track whether we're using offline cached data
+      isOfflineData.value = !_connectivityService.isOnline.value;
+
       final requestId = ++_requestId;
 
       // ✅ Clear immediately so old data never shows
@@ -102,9 +110,9 @@ class CicoReportController extends GetxController {
         '   API will receive: from_date=${dateFromFilter.value.isNotEmpty ? dateFromFilter.value : 'null'}, to_date=${dateToFilter.value.isNotEmpty ? dateToFilter.value : 'null'}',
       );
 
-      // Use the new CICO report API with date filtering
+      // Fetch report (online or cached depending on HybridApiService)
       final reportList = await apiService.getCicoReport(
-        teacherId: currentUser.code, // Use M1_CODE instead of group1
+        teacherId: currentUser.code,
         className: className ?? selectedClass.value,
         fromDate: dateFromFilter.value.isNotEmpty ? dateFromFilter.value : null,
         toDate: dateToFilter.value.isNotEmpty ? dateToFilter.value : null,
@@ -112,37 +120,42 @@ class CicoReportController extends GetxController {
 
       print('✅ Fetched ${reportList.length} CICO report records');
 
-      // If CICO report is empty, try fallback to checked out books
-      if (reportList.isEmpty) {
+      // ------------------------------------------------------------------
+      // ONLINE ONLY: Try fallback API if CICO report is empty
+      // ------------------------------------------------------------------
+      if (reportList.isEmpty && !isOfflineData.value) {
         print('⚠️ CICO report empty, trying fallback to checked out books...');
+
         final fallbackList = await apiService.getCheckedOutBooks(
-          teacherId: currentUser.code, // Use M1_CODE instead of group1
+          teacherId: currentUser.code,
           className: className ?? selectedClass.value,
           fromDate: dateFromFilter.value.isNotEmpty
               ? dateFromFilter.value
               : null,
           toDate: dateToFilter.value.isNotEmpty ? dateToFilter.value : null,
         );
+
         print('📋 Fallback returned ${fallbackList.length} records');
 
         if (fallbackList.isNotEmpty) {
-          // Use fallback data
           if (requestId != _requestId) return;
+
           _processReportData(fallbackList, 'fallback checked out books');
           return;
         } else {
           print('❌ Both CICO report and fallback returned empty results');
+
           Get.snackbar(
             'सूचना',
             'कोई डेटा नहीं मिला। कृपया फिल्टर बदलकर देखें।',
             backgroundColor: Colors.orange,
             colorText: Colors.white,
           );
+
           bookIssues.clear();
           filteredBookIssues.clear();
           searchQuery.value = '';
 
-          // Force UI updates
           bookIssues.refresh();
           filteredBookIssues.refresh();
           searchQuery.refresh();
@@ -150,16 +163,51 @@ class CicoReportController extends GetxController {
         }
       }
 
-      // Process the CICO report data
+      // ------------------------------------------------------------------
+      // OFFLINE: No cached data available
+      // ------------------------------------------------------------------
+      if (reportList.isEmpty && isOfflineData.value) {
+        Get.snackbar(
+          'ऑफलाइन मोड',
+          'इंटरनेट कनेक्शन नहीं है और कोई कैश्ड डेटा नहीं मिला। पहले ऑनलाइन होकर डेटा डाउनलोड करें।',
+          backgroundColor: Colors.orange.shade100,
+          duration: const Duration(seconds: 4),
+        );
+
+        bookIssues.clear();
+        filteredBookIssues.clear();
+        searchQuery.value = '';
+
+        bookIssues.refresh();
+        filteredBookIssues.refresh();
+        searchQuery.refresh();
+        return;
+      }
+
+      // ------------------------------------------------------------------
+      // OFFLINE: Showing cached data
+      // ------------------------------------------------------------------
+      if (isOfflineData.value && reportList.isNotEmpty) {
+        Get.snackbar(
+          'ऑफलाइन डेटा',
+          'आप ऑफलाइन हैं — यह पिछला सेव किया गया डेटा दिखाया जा रहा है।',
+          backgroundColor: Colors.blue.shade100,
+          duration: const Duration(seconds: 3),
+        );
+      }
+
       if (requestId != _requestId) return;
-      _processReportData(reportList, 'CICO report API');
+
+      _processReportData(
+        reportList,
+        isOfflineData.value ? 'offline cache' : 'CICO report API',
+      );
     } catch (e) {
       print('❌ Error in fetchBookIssues: $e');
       print('📍 Stack trace: ${StackTrace.current}');
       Get.snackbar('Error', 'Failed to load CICO report: $e');
     } finally {
       isLoading.value = false;
-      // Force UI update for loading state
       isLoading.refresh();
     }
   }

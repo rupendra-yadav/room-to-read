@@ -830,8 +830,8 @@ class HybridApiService extends GetxService {
     String? dateTo,
     String? aggregation,
   }) async {
-    try {
-      if (_connectivityService.isOnline.value) {
+    if (_connectivityService.isOnline.value) {
+      try {
         return await _apiService.getAnalytics(
           teacherId: teacherId,
           className: className,
@@ -839,25 +839,46 @@ class HybridApiService extends GetxService {
           dateTo: dateTo,
           aggregation: aggregation,
         );
-      } else {
-        return {
-          'success': true,
-          'data': {
-            'totalCheckouts': 0,
-            'totalCheckins': 0,
-            'totalStudents': 0,
-            'totalBooks': 0,
-          },
-          'offline': true,
-        };
+      } catch (e) {
+        print('❌ Analytics online fetch failed, falling back offline: $e');
       }
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Error fetching analytics: $e',
-        'offline': true,
-      };
     }
+
+    // Offline: derive summary + a simple daily chart from cached CICO rows
+    final rows = await _offlineDb.getCicoReportOffline(
+      teacherId: teacherId ?? '',
+      className: className,
+      fromDate: dateFrom,
+      toDate: dateTo,
+    );
+
+    int checkouts = 0, checkins = 0;
+    final Map<String, int> byDay = {};
+
+    for (final r in rows) {
+      final type = r['transactionType'];
+      if (type == 'checkout') {
+        checkouts++;
+      } else {
+        checkins++;
+      }
+      final day = (r['transactionDate']?.toString() ?? '').split('T').first;
+      if (day.isNotEmpty) {
+        byDay[day] = (byDay[day] ?? 0) + 1;
+      }
+    }
+
+    return {
+      'success': true,
+      'offline': true,
+      'summary': {
+        'totalCheckouts': checkouts,
+        'totalCheckins': checkins,
+        'totalTransactions': rows.length,
+      },
+      'chart': byDay,
+      'list': rows,
+    };
   }
 
   Future<Map<dynamic, dynamic>> getBookDetails(String bookIdentifier) async {
@@ -877,26 +898,79 @@ class HybridApiService extends GetxService {
     }
   }
 
+  // Future<List<dynamic>> getCicoReport({
+  //   required String teacherId,
+  //   String? className,
+  //   String? fromDate,
+  //   String? toDate,
+  // }) async {
+  //   try {
+  //     if (_connectivityService.isOnline.value) {
+  //       return await _apiService.getCicoReport(
+  //         teacherId: teacherId,
+  //         className: className,
+  //         fromDate: fromDate,
+  //         toDate: toDate,
+  //       );
+  //     } else {
+  //       return [];
+  //     }
+  //   } catch (e) {
+  //     return [];
+  //   }
+  // }
+
   Future<List<dynamic>> getCicoReport({
     required String teacherId,
     String? className,
     String? fromDate,
     String? toDate,
   }) async {
-    try {
-      if (_connectivityService.isOnline.value) {
-        return await _apiService.getCicoReport(
+    if (_connectivityService.isOnline.value) {
+      try {
+        final online = await _apiService.getCicoReport(
           teacherId: teacherId,
           className: className,
           fromDate: fromDate,
           toDate: toDate,
         );
-      } else {
-        return [];
+
+        if (online.isNotEmpty) {
+          await _offlineDb.saveCicoReportOffline(
+            online.cast<Map<String, dynamic>>(),
+            teacherId,
+          );
+        }
+        return online;
+      } catch (e) {
+        print('❌ CICO report online fetch failed, falling back offline: $e');
       }
-    } catch (e) {
-      return [];
     }
+
+    // Offline: cached server rows + any not-yet-synced local checkin/checkout activity
+    final cached = await _offlineDb.getCicoReportOffline(
+      teacherId: teacherId,
+      className: className,
+      fromDate: fromDate,
+      toDate: toDate,
+    );
+
+    final pending = await _offlineDb.getPendingOfflineTransactions();
+    final pendingForTeacher = pending
+        .where((t) => t['teacher_id'] == teacherId)
+        .map(
+          (t) => {
+            'F4_PARTY1N': t['student_name'],
+            'F4_PARTYN': t['book_name'],
+            'F4_LCODE': t['book_code'],
+            'F4_TXT2': t['class_name'],
+            'F4_BT': t['transaction_type'] == 'checkout' ? '1' : '2',
+            'F4_USERDT': t['transaction_date'],
+          },
+        )
+        .toList();
+
+    return [...cached, ...pendingForTeacher];
   }
 
   Future<int> getBookIssueCount(String teacherId) async {

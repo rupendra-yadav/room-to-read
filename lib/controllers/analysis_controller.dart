@@ -21,6 +21,8 @@ class AnalysisController extends GetxController {
   var avgPerMonth = 0.obs;
   var reportList = <Map<String, dynamic>>[].obs;
 
+  var isOfflineData = false.obs;
+
   final aggregations = ['दैनिक', 'साप्ताहिक', 'मासिक', 'वार्षिक'];
 
   @override
@@ -214,39 +216,68 @@ class AnalysisController extends GetxController {
       print('   Will send class to API: ${className != null ? "YES" : "NO"}');
 
       final result = await apiService.getAnalytics(
-        teacherId: currentUser.code, // Use M1_CODE instead of group1
+        teacherId: currentUser.code,
         className: className,
-        dateFrom: dateFromFilter.value.isNotEmpty
-            ? dateFromFilter.value
-            : null, // Use dateFrom parameter
-        dateTo: dateToFilter.value.isNotEmpty
-            ? dateToFilter.value
-            : null, // Use dateTo parameter
+        dateFrom: dateFromFilter.value.isNotEmpty ? dateFromFilter.value : null,
+        dateTo: dateToFilter.value.isNotEmpty ? dateToFilter.value : null,
         aggregation: apiAggregation,
       );
 
+      // ✅ Detect whether response came from offline cache
+      isOfflineData.value = result['offline'] == true;
+
       print('📊 Analytics API result: ${result['success']}');
+      print('📊 Offline Mode: ${isOfflineData.value}');
       print('📊 Full API response: $result');
 
       if (result['success'] == true) {
-        // Parse chart data
         final chart = result['chart'] as Map<String, dynamic>? ?? {};
-        chartLabels.value = List<String>.from(chart['labels'] ?? []);
-        chartValues.value = List<int>.from(chart['values'] ?? []);
 
-        // If no data from API, show empty state
+        // ------------------------------------------------------------------
+        // ONLINE RESPONSE
+        // ------------------------------------------------------------------
+        if (!isOfflineData.value) {
+          chartLabels.value = List<String>.from(chart['labels'] ?? []);
+          chartValues.value = List<int>.from(chart['values'] ?? []);
+        }
+        // ------------------------------------------------------------------
+        // OFFLINE RESPONSE
+        // Chart format is {day: count}
+        // ------------------------------------------------------------------
+        else {
+          final sortedDays = chart.keys.toList()..sort();
+
+          chartLabels.value = sortedDays;
+          chartValues.value = sortedDays
+              .map((day) => (chart[day] as num).toInt())
+              .toList();
+
+          Get.snackbar(
+            'ऑफलाइन एनालिटिक्स',
+            'आप ऑफलाइन हैं — यह स्थानीय कैश्ड डेटा से गणना की गई है।',
+            backgroundColor: Colors.blue.shade100,
+            duration: const Duration(seconds: 3),
+          );
+        }
+
+        // If no data
         if (chartLabels.isEmpty || chartValues.isEmpty) {
-          print('⚠️ No analytics data available from API');
+          print('⚠️ No analytics data available');
+
           chartLabels.value = [];
           chartValues.value = [];
           totalRecords.value = 0;
           avgPerMonth.value = 0;
         }
 
-        // Parse summary data
+        // Summary
         final summary = result['summary'] as Map<String, dynamic>? ?? {};
+
         totalRecords.value =
-            summary['total_records'] ?? chartValues.fold(0, (a, b) => a + b);
+            summary['totalTransactions'] ??
+            summary['total_records'] ??
+            chartValues.fold(0, (a, b) => a + b);
+
         avgPerMonth.value =
             summary['avg_per_month'] ??
             (chartValues.isNotEmpty
@@ -254,19 +285,19 @@ class AnalysisController extends GetxController {
                       .round()
                 : 0);
 
-        // Parse list data
+        // Report list
         reportList.value = List<Map<String, dynamic>>.from(
           result['list'] ?? [],
         );
 
         print('✅ Analytics loaded successfully:');
+        print('   Offline: ${isOfflineData.value}');
         print('   Total Records: ${totalRecords.value}');
         print('   Avg Per Month: ${avgPerMonth.value}');
         print('   Chart Labels: ${chartLabels.length} - $chartLabels');
         print('   Chart Values: ${chartValues.length} - $chartValues');
         print('   Report List: ${reportList.length}');
 
-        // Force UI updates
         chartLabels.refresh();
         chartValues.refresh();
         totalRecords.refresh();
@@ -275,7 +306,6 @@ class AnalysisController extends GetxController {
       } else {
         print('❌ Analytics API failed: ${result['message']}');
 
-        // Show empty state when API fails
         chartLabels.value = [];
         chartValues.value = [];
         totalRecords.value = 0;
@@ -287,13 +317,12 @@ class AnalysisController extends GetxController {
           result['message'] ?? 'Failed to load analytics data',
           backgroundColor: Colors.orange,
           colorText: Colors.white,
-          duration: Duration(seconds: 4),
+          duration: const Duration(seconds: 4),
         );
       }
     } catch (e) {
       print('❌ Error fetching analytics: $e');
 
-      // Show empty state on error
       chartLabels.value = [];
       chartValues.value = [];
       totalRecords.value = 0;

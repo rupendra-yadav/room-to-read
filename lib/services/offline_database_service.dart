@@ -19,7 +19,7 @@ class OfflineDatabaseService extends GetxService {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -27,6 +27,29 @@ class OfflineDatabaseService extends GetxService {
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     print('🔄 Database upgrade: v$oldVersion → v$newVersion');
+    if (oldVersion < 4) {
+      try {
+        await db.execute('''
+      CREATE TABLE IF NOT EXISTS cico_report_cache (
+        id TEXT PRIMARY KEY,
+        teacherId TEXT,
+        studentId TEXT,
+        studentName TEXT,
+        bookId TEXT,
+        bookName TEXT,
+        bookCode TEXT,
+        className TEXT,
+        transactionType TEXT,
+        transactionDate TEXT,
+        cachedAt TEXT,
+        rawData TEXT
+      )
+    ''');
+        print('✅ Created cico_report_cache table');
+      } catch (e) {
+        print('⚠️ Error creating cico_report_cache: $e');
+      }
+    }
     if (oldVersion < 3) {
       try {
         // Recreate grades_cache with UNIQUE constraint
@@ -257,6 +280,23 @@ class OfflineDatabaseService extends GetxService {
     code TEXT NOT NULL UNIQUE, 
     name TEXT NOT NULL,
     cached_at TEXT NOT NULL
+  )
+''');
+
+    await db.execute('''
+  CREATE TABLE IF NOT EXISTS cico_report_cache (
+    id TEXT PRIMARY KEY,
+    teacherId TEXT,
+    studentId TEXT,
+    studentName TEXT,
+    bookId TEXT,
+    bookName TEXT,
+    bookCode TEXT,
+    className TEXT,
+    transactionType TEXT,
+    transactionDate TEXT,
+    cachedAt TEXT,
+    rawData TEXT
   )
 ''');
 
@@ -813,6 +853,102 @@ class OfflineDatabaseService extends GetxService {
       );
     } catch (e) {
       print('❌ Error deleting synced transactions: $e');
+    }
+  }
+
+  // ============= CICO REPORT CACHE =============
+  Future<void> saveCicoReportOffline(
+    List<Map<String, dynamic>> records,
+    String teacherId,
+  ) async {
+    try {
+      final db = await database;
+
+      // Replace this teacher's cached report with the freshest server data
+      await db.delete(
+        'cico_report_cache',
+        where: 'teacherId = ?',
+        whereArgs: [teacherId],
+      );
+
+      for (final r in records) {
+        final id =
+            r['id']?.toString() ??
+            '${r['F4_LCODE'] ?? r['bookCode']}_${r['F4_PARTY1'] ?? r['studentId']}_${r['F4_USERDT'] ?? r['transactionDate'] ?? DateTime.now().millisecondsSinceEpoch}';
+
+        await db.insert('cico_report_cache', {
+          'id': id,
+          'teacherId': teacherId,
+          'studentId': (r['F4_PARTY1'] ?? r['studentId'] ?? '').toString(),
+          'studentName': (r['F4_PARTY1N'] ?? r['studentName'] ?? '').toString(),
+          'bookId': (r['F4_PARTY'] ?? r['bookId'] ?? '').toString(),
+          'bookName': (r['F4_PARTYN'] ?? r['bookName'] ?? '').toString(),
+          'bookCode': (r['F4_LCODE'] ?? r['bookCode'] ?? '').toString(),
+          'className': (r['F4_TXT2'] ?? r['F4_TXT1'] ?? r['className'] ?? '')
+              .toString(),
+          'transactionType': (r['F4_BT']?.toString() == '1')
+              ? 'checkout'
+              : 'checkin',
+          'transactionDate': (r['F4_USERDT'] ?? r['transactionDate'] ?? '')
+              .toString(),
+          'cachedAt': DateTime.now().toIso8601String(),
+          'rawData': jsonEncode(r),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+
+      print('✅ Cached ${records.length} CICO report rows offline');
+    } catch (e) {
+      print('❌ Error saving CICO report cache: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCicoReportOffline({
+    required String teacherId,
+    String? className,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    try {
+      final db = await database;
+
+      String where = 'teacherId = ?';
+      List<dynamic> args = [teacherId];
+
+      if (className != null && className.isNotEmpty) {
+        where += ' AND className = ?';
+        args.add(className);
+      }
+
+      final rows = await db.query(
+        'cico_report_cache',
+        where: where,
+        whereArgs: args,
+      );
+
+      // Date filtering done in Dart since dates come in mixed formats
+      return rows.where((r) {
+        final dateStr = r['transactionDate']?.toString() ?? '';
+        final date = DateTime.tryParse(dateStr.replaceFirst(' ', 'T'));
+        if (date == null) return true;
+        if (fromDate != null && fromDate.isNotEmpty) {
+          final from = DateTime.tryParse(fromDate);
+          if (from != null &&
+              date.isBefore(DateTime(from.year, from.month, from.day))) {
+            return false;
+          }
+        }
+        if (toDate != null && toDate.isNotEmpty) {
+          final to = DateTime.tryParse(toDate);
+          if (to != null &&
+              date.isAfter(DateTime(to.year, to.month, to.day, 23, 59, 59))) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
+    } catch (e) {
+      print('❌ Error reading CICO report cache: $e');
+      return [];
     }
   }
 

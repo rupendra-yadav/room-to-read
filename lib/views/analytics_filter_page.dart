@@ -361,9 +361,7 @@ class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
                               );
                             }).toList(),
                             onChanged: (String? newValue) {
-                              controller.setAggregation(
-                                newValue ?? 'monthly',
-                              );
+                              controller.setAggregation(newValue ?? 'monthly');
                             },
                           ),
                         ),
@@ -379,9 +377,7 @@ class AnalyticsFilterPage extends GetView<AnalyticsFilterController> {
                         Obx(
                           () => Container(
                             padding: EdgeInsets.all(isMobile ? 12 : 14),
-                            margin: EdgeInsets.only(
-                              bottom: isMobile ? 16 : 20,
-                            ),
+                            margin: EdgeInsets.only(bottom: isMobile ? 16 : 20),
                             decoration: BoxDecoration(
                               color: controller.filtersValid.value
                                   ? Colors.green[50]

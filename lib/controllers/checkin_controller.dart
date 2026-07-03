@@ -999,9 +999,32 @@ class CheckinController extends GetxController {
         // The book will be removed from the backend on next sync or refresh
 
         // Show appropriate success message
+        String onlineMessage;
+        String offlineMessage;
+
+        switch (condition) {
+          case 'good':
+            onlineMessage = 'किताब सफलतापूर्वक वापस की गई!';
+            offlineMessage =
+                'किताब ऑफलाइन वापस की गई! 📱\nऑनलाइन होने पर यह स्वचालित रूप से सिंक होगा।';
+            break;
+
+          case 'damaged':
+            onlineMessage =
+                'किताब को क्षतिग्रस्त (Damaged) के रूप में दर्ज किया गया!';
+            offlineMessage =
+                'किताब को ऑफलाइन क्षतिग्रस्त (Damaged) के रूप में दर्ज किया गया! 📱\nऑनलाइन होने पर यह स्वचालित रूप से सिंक होगा।';
+            break;
+
+          default: // lost
+            onlineMessage = 'किताब को खोई हुई (Lost) के रूप में दर्ज किया गया!';
+            offlineMessage =
+                'किताब को ऑफलाइन खोई हुई (Lost) के रूप में दर्ज किया गया! 📱\nऑनलाइन होने पर यह स्वचालित रूप से सिंक होगा।';
+        }
+
         final message = result['offline'] == true
-            ? 'किताब ऑफलाइन वापस की गई! 📱\nऑनलाइन होने पर यह स्वचालित रूप से सिंक होगा।'
-            : result['message'] ?? 'किताब सफलतापूर्वक वापस की गई!';
+            ? offlineMessage
+            : onlineMessage;
 
         print('\n✅ CHECKIN SUCCESS:');
         print('   Offline: ${result['offline']}');
@@ -1134,9 +1157,20 @@ class CheckinController extends GetxController {
   }
 
   void setDateFilter(String from, String to) {
+    // If both dates set and 'to' is before 'from', reset 'to'
+    if (from.isNotEmpty && to.isNotEmpty) {
+      final fromDate = DateTime.tryParse(from);
+      final toDate = DateTime.tryParse(to);
+      if (fromDate != null && toDate != null && toDate.isBefore(fromDate)) {
+        dateToFilter.value = ''; // Clear invalid 'to' date
+        dateFromFilter.value = from;
+        return;
+      }
+    }
+
     dateFromFilter.value = from;
     dateToFilter.value = to;
-    // Only fetch if at least one date is set, otherwise clear
+
     if (from.isEmpty && to.isEmpty) {
       checkedOutBooks.clear();
       filteredRecords.clear();
