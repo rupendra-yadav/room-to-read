@@ -30,22 +30,43 @@ class HybridApiService extends GetxService {
             .toList();
 
         if (students.isNotEmpty) {
-          await _offlineDb.saveStudentsOffline(
-            students
-                .map(
-                  (s) => {
-                    'M1_NO': s.id,
-                    'M1_CODE': s.code,
-                    'M1_NAME': s.name,
-                    'M1_GROUP2N': s.className,
-                    'M1_GROUP2': s.teacherId,
-                    'books_issued': s.booksIssued,
-                    'last_updated': s.lastUpdated.toIso8601String(),
-                  },
-                )
-                .toList(),
-          );
-          return students;
+          final db = await _offlineDb.database;
+          final localRows = await db.query('students');
+          final localMap = {for (var r in localRows) r['code']: r};
+
+          final mergedForSave = <Map<String, dynamic>>[];
+          final mergedStudents = <Student>[];
+
+          for (final s in students) {
+            final local = localMap[s.code];
+            final mergedReadingLevel =
+                local?['readingLevel'] as int? ?? s.readingLevel;
+            final mergedPreviousLevel =
+                local?['previousLevel'] as int? ?? s.previousLevel;
+
+            mergedForSave.add({
+              'M1_NO': s.id,
+              'M1_CODE': s.code,
+              'M1_NAME': s.name,
+              'M1_GROUP2N': s.className,
+              'M1_GROUP2': s.teacherId,
+              'books_issued': s.booksIssued,
+              'last_updated': s.lastUpdated.toIso8601String(),
+              'readingLevel': mergedReadingLevel,
+              'previousLevel': mergedPreviousLevel,
+            });
+
+            mergedStudents.add(
+              s.copyWith(
+                readingLevel: mergedReadingLevel,
+                currentLevel: mergedReadingLevel,
+                previousLevel: mergedPreviousLevel,
+              ),
+            );
+          }
+
+          await _offlineDb.saveStudentsOffline(mergedForSave);
+          return mergedStudents; // ✅ now returns the merged data
         }
       } catch (_) {}
     }
@@ -62,9 +83,9 @@ class HybridApiService extends GetxService {
             lastUpdated:
                 DateTime.tryParse(e['lastUpdated'] ?? '') ?? DateTime.now(),
             teacherId: e['teacherId'] ?? '',
-            readingLevel: 0,
-            previousLevel: 0,
-            currentLevel: 0,
+            readingLevel: e['readingLevel'] ?? 0,
+            previousLevel: e['previousLevel'] ?? 0,
+            currentLevel: e['currentLevel'] ?? 0,
           ),
         )
         .toList();

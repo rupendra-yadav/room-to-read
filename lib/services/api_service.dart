@@ -16,9 +16,18 @@ class ApiService extends GetxService {
           ? {'M1_GROUP2': group1}
           : <String, String>{};
 
-      var response = await GetConnect(
-        timeout: const Duration(seconds: 30),
-      ).post(ApiConfig.studentUrl, body);
+      var response = await GetConnect(userAgent: 'Mozilla/5.0', sendUserAgent: true, timeout: Duration(seconds: 30))
+          .post(
+            ApiConfig.studentUrl,
+            body,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+              'Accept': 'application/json',
+            },
+          );
+
+      print(" API: Response body: ${group1}");
+      print('📡 API: Response body: ${response.body}');
 
       // If 404, try alternative endpoint
       if (response.statusCode == 404) {
@@ -298,15 +307,10 @@ class ApiService extends GetxService {
   ) async {
     try {
       // Use FormData to match other API calls and Postman format
-      final formData = FormData({
+      var response = await GetConnect().post(ApiConfig.updateReadingLevelUrl, {
         'M1_CODE': studentCode,
         'cur_read_level': newReadingLevel.toString(),
       });
-
-      var response = await GetConnect().post(
-        ApiConfig.updateReadingLevelUrl,
-        formData,
-      );
 
       if (response.statusCode == 200) {
         var data = response.body;

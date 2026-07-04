@@ -7,6 +7,7 @@ import 'package:room_to_read/views/student_book_history_page.dart';
 import 'package:room_to_read/views/update_reading_level_page.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
 import 'package:room_to_read/widgets/shimmer_loading.dart';
+import 'package:room_to_read/controllers/student_controller.dart';
 
 class StudentDetailPage extends StatefulWidget {
   final Student student;
@@ -149,7 +150,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                               ),
                             ),
                             Text(
-                              'ID: ${widget.student.id} • कक्षा: ${widget.student.className}',
+                              'ID: ${widget.student.id} • ग्रेड: ${widget.student.className}',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: isMobile ? 13 : 14,
@@ -251,85 +252,29 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                         '🔍 Received reading level update: $result (type: ${result.runtimeType})',
                       );
 
-                      // Call hybrid API to update reading level (works online/offline)
+                      final previousLevel = widget.student.readingLevel;
+                      final studentController = Get.find<StudentController>();
+
                       try {
-                        final response = await controller.apiService
-                            .updateReadingLevel(widget.student.code, result);
+                        // Goes through StudentController so it: updates in-memory list,
+                        // writes to local SQLite `students` table, and queues an offline
+                        // sync row if there's no connectivity.
+                        await studentController.updateReadingLevel(
+                          widget.student.code,
+                          previousLevel,
+                          result,
+                        );
 
-                        print('🔍 API Response: $response');
+                        // Reflect the change on this detail page's own widget.student
+                        widget.student.previousLevel = previousLevel;
+                        widget.student.readingLevel = result;
+                        widget.student.currentLevel = result;
 
-                        // Check if response indicates success
-                        if (response['success'] == true) {
-                          final previousLevel = widget.student.readingLevel;
+                        setState(() {});
 
-                          // Update student object with data from API response if available
-                          if (response['data'] != null &&
-                              response['data'] is Map &&
-                              (response['data'] as Map).isNotEmpty) {
-                            final apiData =
-                                response['data'] as Map<String, dynamic>;
-
-                            // Update with actual API response data
-                            final newLevel =
-                                int.tryParse(
-                                  apiData['M1_TXT2']?.toString() ?? '',
-                                ) ??
-                                result;
-                            final actualPreviousLevel =
-                                int.tryParse(
-                                  apiData['M1_TXT1']?.toString() ?? '',
-                                ) ??
-                                previousLevel;
-
-                            widget.student.readingLevel = newLevel;
-                            widget.student.currentLevel = newLevel;
-                            widget.student.previousLevel = actualPreviousLevel;
-
-                            print(
-                              '✅ Updated student from API data: previous=$actualPreviousLevel, current=$newLevel',
-                            );
-                          } else {
-                            // API update successful but no data returned - update manually
-                            // This is common when API only confirms the update without returning full data
-                            final newLevel = result;
-                            widget.student.previousLevel =
-                                previousLevel; // Store the old level as previous
-                            widget.student.readingLevel = newLevel;
-                            widget.student.currentLevel = newLevel;
-
-                            print(
-                              '✅ Updated student manually after successful API call: previous=$previousLevel, current=$newLevel',
-                            );
-                          }
-
-                          final currentLevel = widget.student.readingLevel;
-                          final prevLevel = widget.student.previousLevel;
-
-                          // Show appropriate success message
-                          final message = response['offline'] == true
-                              ? 'रीडिंग लेवल ऑफलाइन अपडेट: $prevLevel → $currentLevel (सिंक के लिए इंतजार में)'
-                              : 'रीडिंग लेवल अपडेट हो गया: $prevLevel → $currentLevel';
-
-                          Get.snackbar(
-                            'सफल',
-                            message,
-                            backgroundColor: Colors.green,
-                            colorText: Colors.white,
-                            duration: const Duration(seconds: 3),
-                          );
-
-                          // Refresh UI
-                          setState(() {});
-                        } else {
-                          Get.snackbar(
-                            'त्रुटि',
-                            response['message'] ??
-                                'रीडिंग लेवल अपडेट करने में विफल',
-                            backgroundColor: Colors.red,
-                            colorText: Colors.white,
-                            duration: const Duration(seconds: 3),
-                          );
-                        }
+                        print(
+                          '✅ Updated student: previous=$previousLevel, current=$result',
+                        );
                       } catch (e) {
                         Get.snackbar(
                           'त्रुटि',
