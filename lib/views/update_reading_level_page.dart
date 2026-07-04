@@ -17,7 +17,7 @@ class UpdateReadingLevelPage extends StatefulWidget {
 class _UpdateReadingLevelPageState extends State<UpdateReadingLevelPage> {
   late TextEditingController levelController;
   late DateTime selectedDate;
-  late int selectedLevel;
+  int? selectedLevel;
   bool _hasPendingUpdate = false;
 
   @override
@@ -26,7 +26,10 @@ class _UpdateReadingLevelPageState extends State<UpdateReadingLevelPage> {
     levelController = TextEditingController(
       text: widget.student.readingLevel.toString(),
     );
-    selectedLevel = widget.student.readingLevel;
+    selectedLevel =
+        widget.student.readingLevel >= 1 && widget.student.readingLevel <= 6
+        ? widget.student.readingLevel
+        : null;
     selectedDate = DateTime.now();
     _checkPendingUpdate();
   }
