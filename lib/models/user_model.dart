@@ -36,39 +36,8 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    try {
-      // Debug logging to see what fields are available
-      print('🔍 UserModel.fromJson - Available fields: ${json.keys.toList()}');
-      print(
-        '🔍 M1_GROUP value: "${json['M1_GROUP']}" (${json['M1_GROUP'].runtimeType})',
-      );
-      print(
-        '🔍 M1_GROUP1 value: "${json['M1_GROUP1']}" (${json['M1_GROUP1'].runtimeType})',
-      );
-      print(
-        '🔍 program_code value: "${json['program_code']}" (${json['program_code'].runtimeType})',
-      );
-      print(
-        '🔍 school_name value: "${json['school_name']}" (${json['school_name'].runtimeType})',
-      );
-      print(
-        '🔍 school_gsd_id value: "${json['school_gsd_id']}" (${json['school_gsd_id'].runtimeType})',
-      );
-
-      final groupValue = _getGroupValue(json);
-      print('✅ FINAL group value selected: "$groupValue"');
-
-      // ✅ CRITICAL FIX: The API returns M1_GROUP and M1_GROUP1 with SWAPPED values
-      // API returns: M1_GROUP=program_id (2014), M1_GROUP1=school_id (3898)
-      // We need: group=school_id (3898), group1=program_id (2014)
-      // So we SWAP them when parsing
-      final apiM1Group = (json['M1_GROUP'] ?? '').toString();
-      final apiM1Group1 = (json['M1_GROUP1'] ?? '').toString();
-      
-      print('   🔄 SWAPPING M1_GROUP and M1_GROUP1 values:');
-      print('      API M1_GROUP: $apiM1Group → will use as group1 (program_id)');
-      print('      API M1_GROUP1: $apiM1Group1 → will use as group (school_id)');
-
+    // If this is our own serialized format, values are already correct — don't swap
+    if (json.containsKey('_serialized')) {
       return UserModel(
         code: (json['M1_CODE'] ?? '').toString(),
         type: (json['M1_TYPE'] ?? '').toString(),
@@ -78,27 +47,44 @@ class UserModel {
         dt1: (json['M1_DT1'] ?? '').toString(),
         dt2: (json['M1_DT2'] ?? '').toString(),
         bt: (json['M1_BT'] ?? '').toString(),
-        group: apiM1Group1, // ✅ SWAP: Use M1_GROUP1 as group (school_id)
-        group1: apiM1Group, // ✅ SWAP: Use M1_GROUP as group1 (program_id)
+        group: (json['group'] ?? '').toString(),
+        group1: (json['group1'] ?? '').toString(),
         tel: (json['M1_TEL'] ?? '').toString(),
         pa: (json['M1_PA'] ?? '').toString(),
         it: (json['M1_IT'] ?? '').toString(),
         opp: (json['M1_OPP'] ?? '').toString(),
-        // Use M1_GROUP1 as school_id and student_id (dual purpose)
         sch: (json['school_name'] ?? '').toString(),
         prg: (json['program_code'] ?? '').toString(),
-        // ✅ FIXED: Use M1_GROUP if available and not empty, otherwise fallback to school_gsd_id or M1_GROUP1
-        // group: groupValue,
       );
-    } catch (e) {
-      print('❌ Error parsing UserModel: $e');
-      print('📄 JSON data: $json');
-      rethrow;
     }
+
+    // Raw API response — apply the one-time swap as before
+    final apiM1Group = (json['M1_GROUP'] ?? '').toString();
+    final apiM1Group1 = (json['M1_GROUP1'] ?? '').toString();
+
+    return UserModel(
+      code: (json['M1_CODE'] ?? '').toString(),
+      type: (json['M1_TYPE'] ?? '').toString(),
+      no: (json['M1_NO'] ?? '').toString(),
+      name: (json['M1_NAME'] ?? '').toString(),
+      lname: (json['M1_LNAME'] ?? '').toString(),
+      dt1: (json['M1_DT1'] ?? '').toString(),
+      dt2: (json['M1_DT2'] ?? '').toString(),
+      bt: (json['M1_BT'] ?? '').toString(),
+      group: apiM1Group1,
+      group1: apiM1Group,
+      tel: (json['M1_TEL'] ?? '').toString(),
+      pa: (json['M1_PA'] ?? '').toString(),
+      it: (json['M1_IT'] ?? '').toString(),
+      opp: (json['M1_OPP'] ?? '').toString(),
+      sch: (json['school_name'] ?? '').toString(),
+      prg: (json['program_code'] ?? '').toString(),
+    );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      '_serialized': true,
       'M1_CODE': code,
       'M1_TYPE': type,
       'M1_NO': no,
@@ -107,8 +93,8 @@ class UserModel {
       'M1_DT1': dt1,
       'M1_DT2': dt2,
       'M1_BT': bt,
-      'M1_GROUP': group,
-      'M1_GROUP1': group1,
+      'group': group, // store final values directly, no re-swap
+      'group1': group1,
       'M1_TEL': tel,
       'M1_PA': pa,
       'M1_IT': it,

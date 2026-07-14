@@ -9,14 +9,14 @@ class HomeBinding extends Bindings {
     if (!Get.isRegistered<ApiService>()) {
       Get.lazyPut<ApiService>(() => ApiService());
     }
-    
+
     // Initialize HomeController with proper error handling
     try {
       Get.delete<HomeController>(force: true);
     } catch (e) {
       print('⚠️ HomeController not found for deletion: $e');
     }
-    
+
     Get.put<HomeController>(HomeController(), permanent: true);
     print('✅ HomeController initialized in HomeBinding');
   }

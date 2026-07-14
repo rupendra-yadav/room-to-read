@@ -4,6 +4,7 @@ import 'package:room_to_read/models/student_model.dart';
 import 'package:room_to_read/services/api_service.dart';
 import 'package:room_to_read/services/auth_service.dart';
 import 'package:room_to_read/widgets/custom_app_bar.dart';
+
 class StudentBookHistoryPage extends StatefulWidget {
   final Student student;
 
@@ -19,7 +20,7 @@ class _StudentBookHistoryPageState extends State<StudentBookHistoryPage> {
   List<dynamic> bookHistory = [];
   bool isLoading = true;
   String dateFromFilter = '';
-  String dateToFilter = '';         
+  String dateToFilter = '';
   String sortBy = 'नवीनतम पहले'; // Default sort: newest first
 
   @override
@@ -352,7 +353,9 @@ class _StudentBookHistoryPageState extends State<StudentBookHistoryPage> {
                   ),
                   SizedBox(height: isMobile ? 8 : 10),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 14),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 14,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),

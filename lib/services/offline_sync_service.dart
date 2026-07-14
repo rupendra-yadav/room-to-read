@@ -389,14 +389,16 @@ class OfflineSyncService extends GetxService {
               '\n📦 Processing checkout batch $batchNumber: ${batch.length} transactions (${i + 1}-$endIndex of ${checkoutTransactions.length})',
             );
 
-            print('\n   🔄 Syncing batch $batchNumber checkout transactions...');
+            print(
+              '\n   🔄 Syncing batch $batchNumber checkout transactions...',
+            );
             final bulkResult = await _syncBulkCheckoutTransactions(batch);
-            
+
             print('\n   📊 Batch $batchNumber checkout sync result:');
             print('      Success: ${bulkResult['success']}');
             print('      Synced Count: ${bulkResult['synced_count']}');
             print('      Message: ${bulkResult['message']}');
-            
+
             // ✅ CRITICAL: Only mark as synced if success AND synced_count > 0
             if (bulkResult['success'] == true &&
                 (bulkResult['synced_count'] as num? ?? 0) > 0) {
@@ -771,7 +773,7 @@ class OfflineSyncService extends GetxService {
             print(
               '      📊 Final Values: book_id=$bookIdForSync, F4_LCODE=${data['F4_LCODE']}, student_id=${data['student_id']}, teacher_id=${data['teacher_id']}',
             );
-            
+
             checkoutRecords.add({
               // ✅ CRITICAL FIX: Include F4_LCODE (book code) for API compatibility
               'F4_LCODE': data['F4_LCODE'], // ✅ Book code (M1_CODE)
@@ -853,14 +855,14 @@ class OfflineSyncService extends GetxService {
         try {
           final transactionId = transaction['transaction_id'] as String;
           final rawData = transaction['raw_data'] as String?;
-          
+
           print('\n📋 ========== PROCESSING CHECKIN TRANSACTION ==========');
           print('   Transaction ID: $transactionId');
           print('   Raw Data Present: ${rawData != null}');
-          
+
           if (rawData != null) {
             final data = jsonDecode(rawData);
-            
+
             // ✅ Debug: Log all fields from raw_data
             print('   📊 Raw Data Fields:');
             print('      F4_BT: ${data['F4_BT']}');
@@ -871,7 +873,7 @@ class OfflineSyncService extends GetxService {
             print('      class: ${data['class']}');
             print('      program_id: ${data['program_id']}');
             print('      school_id: ${data['school_id']}');
-            
+
             // ✅ Use numeric ID and M1_CODE from stored data
             // book_id: NUMERIC ID (needed by bulk API)
             // F4_LCODE: M1_CODE (book code)
@@ -883,7 +885,7 @@ class OfflineSyncService extends GetxService {
             final programId = data['program_id'];
             final schoolId = data['school_id'];
             final f4Bt = data['F4_BT'] ?? '2';
-            
+
             print('   ✅ Extracted Values:');
             print('      bookIdForSync: $bookIdForSync (numeric ID)');
             print('      m1CodeForSync: $m1CodeForSync (M1_CODE)');
@@ -893,7 +895,7 @@ class OfflineSyncService extends GetxService {
             print('      programId: $programId');
             print('      schoolId: $schoolId');
             print('      f4Bt: $f4Bt');
-            
+
             final checkinRecord = {
               'F4_BT': f4Bt,
               'F4_LCODE': m1CodeForSync, // M1_CODE for checkin API
@@ -906,20 +908,18 @@ class OfflineSyncService extends GetxService {
               'M1_GROUP': schoolId, // ✅ NEW: School ID as M1_GROUP
               'M1GROUP1': programId, // ✅ NEW: Program ID as M1GROUP1
             };
-            
+
             print('   📤 Final Checkin Record:');
             checkinRecord.forEach((key, value) {
               print('      $key: $value');
             });
-            
+
             checkinRecords.add(checkinRecord);
             // ✅ CRITICAL: Track which transaction is being sent
             sentTransactionIds.add(transactionId);
             print('   ✅ Record added to batch');
           } else {
-            print(
-              '⚠️ Skipping transaction $transactionId - null raw_data',
-            );
+            print('⚠️ Skipping transaction $transactionId - null raw_data');
           }
           print('===================================================\n');
         } catch (e) {
@@ -937,7 +937,7 @@ class OfflineSyncService extends GetxService {
       print('   Total Records: ${checkinRecords.length}');
       print('   Tracked Transaction IDs: ${sentTransactionIds.length}');
       print('   Records to Send:');
-      
+
       // Log each record being sent
       for (int i = 0; i < checkinRecords.length; i++) {
         final record = checkinRecords[i];

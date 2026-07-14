@@ -317,8 +317,11 @@ class OfflineDatabaseService extends GetxService {
         'mobile': userData['mobile'] ?? userData['phone'] ?? '',
         'email': userData['email'] ?? '',
         'type': userData['type'] ?? 'user',
-        'program_code': userData['program_code'] ?? userData['prg'] ?? '',
-        'school_id': userData['school_id'] ?? userData['sch'] ?? '',
+        // ✅ FIXED: read the same keys UserModel.toJson() actually produces
+        // (previously looked for 'program_code'/'prg' and 'school_id'/'sch',
+        // which don't match toJson()'s output — these always fell through empty)
+        'program_code': userData['group1'] ?? '',
+        'school_id': userData['group'] ?? '',
         'school_name': userData['school_name'] ?? '',
         'logged_in_at': DateTime.now().toIso8601String(),
         'last_sync_at': DateTime.now().toIso8601String(),
@@ -345,8 +348,26 @@ class OfflineDatabaseService extends GetxService {
       );
 
       if (results.isNotEmpty) {
-        print('✅ Retrieved cached user profile: ${results.first['name']}');
-        return Map<String, dynamic>.from(results.first);
+        final row = results.first;
+
+        // ✅ FIXED: Prefer raw_data (the full UserModel.toJson() output,
+        // including the '_serialized' marker) so UserModel.fromJson() takes
+        // the no-swap path, exactly like the SharedPreferences restore path.
+        // Reconstructing from individual columns risked missing '_serialized'
+        // and re-triggering the M1_GROUP/M1_GROUP1 swap incorrectly.
+        final rawData = row['raw_data'];
+        if (rawData != null && rawData.toString().isNotEmpty) {
+          try {
+            final decoded = jsonDecode(rawData.toString());
+            print('✅ Retrieved cached user profile (raw_data): ${row['name']}');
+            return Map<String, dynamic>.from(decoded);
+          } catch (e) {
+            print('⚠️ Failed to decode raw_data, falling back to columns: $e');
+          }
+        }
+
+        print('✅ Retrieved cached user profile: ${row['name']}');
+        return Map<String, dynamic>.from(row);
       }
 
       return null;

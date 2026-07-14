@@ -544,46 +544,46 @@ class ApiService extends GetxService {
       });
 
       // ✅ DEBUG: Log the FormData being sent
-      print('📋 CHECKIN offline : FormData prepared:');
-      print('   F4_BT (Transaction): $bookTransactionCode');
-      print('   F4_LCODE (Book Code): $bookCode');
-      print('   teacher_id: $finalTeacherId');
-      print('   book_id: $bookId');
-      print('   student_id: $studentId');
-      print('   F4_TXT2: $className');
-      print('   program_id: $finalProgramId');
-      print('   school_id: $finalSchoolId');
-      print('   M1_GROUP: $finalSchoolId');
-      print('   M1GROUP1: $finalProgramId');
+      log('📋 CHECKIN offline : FormData prepared:');
+      log('   F4_BT (Transaction): $bookTransactionCode');
+      log('   F4_LCODE (Book Code): $bookCode');
+      log('   teacher_id: $finalTeacherId');
+      log('   book_id: $bookId');
+      log('   student_id: $studentId');
+      log('   F4_TXT2: $className');
+      log('   program_id: $finalProgramId');
+      log('   school_id: $finalSchoolId');
+      log('   M1_GROUP: $finalSchoolId');
+      log('   M1GROUP1: $finalProgramId');
 
       // Log the FormData being sent
-      print('📤 Checkin FormData fields:');
+      log('📤 Checkin FormData fields:');
       for (final field in formData.fields) {
-        print('   ${field.key}: ${field.value}');
+        log('   ${field.key}: ${field.value}');
       }
 
       // ✅ ADD: Include student name and book name if provided
       if (studentName != null && studentName.isNotEmpty) {
         formData.fields.add(MapEntry('student_name', studentName));
-        print('   Added: student_name: $studentName');
+        log('   Added: student_name: $studentName');
       }
       if (bookName != null && bookName.isNotEmpty) {
         formData.fields.add(MapEntry('book_name', bookName));
-        print('   Added: book_name: $bookName');
+        log('   Added: book_name: $bookName');
       }
 
       final stopwatch = Stopwatch()..start();
 
-      print('📤 CHECKIN: Sending to ${ApiConfig.checkinUrl}');
-      print('📋 CHECKIN: Form data: $formData');
+      log('📤 CHECKIN: Sending to ${ApiConfig.checkinUrl}');
+      log('📋 CHECKIN: Form data: $formData');
 
       var response = await GetConnect().post(ApiConfig.checkinUrl, formData);
 
       stopwatch.stop();
 
-      print('📊 CHECKIN: Response status: ${response.statusCode}');
-      print('📊 CHECKIN: Response body: ${response.body}');
-      print('⏱️ CHECKIN: Request took ${stopwatch.elapsedMilliseconds}ms');
+      log('📊 CHECKIN: Response status: ${response.statusCode}');
+      log('📊 CHECKIN: Response body: ${response.body}');
+      log('⏱️ CHECKIN: Request took ${stopwatch.elapsedMilliseconds}ms');
 
       if (response.statusCode == 200) {
         var data = response.body;

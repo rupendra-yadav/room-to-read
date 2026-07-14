@@ -69,10 +69,13 @@ class OfflineSyncControllerEnhanced extends GetxController {
   Future<void> bulkSyncWithDebug() async {
     if (!isOnline.value) {
       _addSyncLog('❌ ऑफलाइन - सिंक के लिए इंटरनेट चाहिए', isError: true);
-      Get.snackbar('ऑफलाइन', 'सिंक के लिए इंटरनेट कनेक्शन चाहिए',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.red,
-          colorText: Colors.white);
+      Get.snackbar(
+        'ऑफलाइन',
+        'सिंक के लिए इंटरनेट कनेक्शन चाहिए',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
       return;
     }
 
@@ -81,15 +84,19 @@ class OfflineSyncControllerEnhanced extends GetxController {
 
       // Step 1: Get pending transactions
       _addSyncLog('📋 Step 1: पेंडिंग ट्रांजैक्शन प्राप्त कर रहे हैं...');
-      final pendingTransactions = await _offlineDb.getPendingOfflineTransactions();
+      final pendingTransactions = await _offlineDb
+          .getPendingOfflineTransactions();
       _addSyncLog('📊 कुल पेंडिंग: ${pendingTransactions.length}');
 
       if (pendingTransactions.isEmpty) {
         _addSyncLog('✅ कोई पेंडिंग ट्रांजैक्शन नहीं');
-        Get.snackbar('कोई डेटा नहीं', 'सिंक करने के लिए कोई ऑफलाइन ट्रांजैक्शन नहीं',
-            snackPosition: SnackPosition.TOP,
-            backgroundColor: Colors.blue,
-            colorText: Colors.white);
+        Get.snackbar(
+          'कोई डेटा नहीं',
+          'सिंक करने के लिए कोई ऑफलाइन ट्रांजैक्शन नहीं',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+        );
         return;
       }
 
@@ -97,22 +104,26 @@ class OfflineSyncControllerEnhanced extends GetxController {
       Get.dialog(
         AlertDialog(
           title: const Text('बल्क सिंक'),
-          content: Obx(() => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(syncStatus.value.isNotEmpty
-                  ? syncStatus.value
-                  : 'डेटा सिंक हो रहा है...'),
-              if (syncProgress.value > 0) ...[
-                const SizedBox(height: 8),
-                LinearProgressIndicator(value: syncProgress.value / 100),
-                const SizedBox(height: 4),
-                Text('${syncProgress.value}% पूरा'),
+          content: Obx(
+            () => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  syncStatus.value.isNotEmpty
+                      ? syncStatus.value
+                      : 'डेटा सिंक हो रहा है...',
+                ),
+                if (syncProgress.value > 0) ...[
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(value: syncProgress.value / 100),
+                  const SizedBox(height: 4),
+                  Text('${syncProgress.value}% पूरा'),
+                ],
               ],
-            ],
-          )),
+            ),
+          ),
         ),
         barrierDismissible: false,
       );
@@ -165,7 +176,7 @@ class OfflineSyncControllerEnhanced extends GetxController {
 
         // Refresh UI
         await loadPendingTransactions();
-        
+
         // ✅ Refresh HomeController to update book issue counts
         try {
           if (Get.isRegistered<HomeController>()) {
@@ -175,9 +186,12 @@ class OfflineSyncControllerEnhanced extends GetxController {
             _addSyncLog('✅ HomeController refreshed');
           }
         } catch (e) {
-          _addSyncLog('⚠️ HomeController रीफ्रेश में त्रुटि: $e', isError: true);
+          _addSyncLog(
+            '⚠️ HomeController रीफ्रेश में त्रुटि: $e',
+            isError: true,
+          );
         }
-        
+
         try {
           if (Get.isRegistered<CheckinController>()) {
             final checkinController = Get.find<CheckinController>();
@@ -212,9 +226,12 @@ class OfflineSyncControllerEnhanced extends GetxController {
   /// Sync bulk checkouts with detailed debugging
   /// API expects: program_id, school_id, teacher_id, book_id, student_id, class
   Future<Map<String, int>> _syncBulkCheckouts(
-      List<Map<String, dynamic>> checkoutTransactions) async {
+    List<Map<String, dynamic>> checkoutTransactions,
+  ) async {
     try {
-      _addSyncLog('🔄 ${checkoutTransactions.length} checkouts तैयार कर रहे हैं...');
+      _addSyncLog(
+        '🔄 ${checkoutTransactions.length} checkouts तैयार कर रहे हैं...',
+      );
 
       // Prepare bulk data with correct field names for API
       final bulkRecords = <Map<String, dynamic>>[];
@@ -223,7 +240,7 @@ class OfflineSyncControllerEnhanced extends GetxController {
           final rawData = transaction['raw_data'] as String?;
           if (rawData != null) {
             final data = jsonDecode(rawData);
-            
+
             // Extract values with proper defaults
             final programId = data['program_id']?.toString() ?? '2014';
             final schoolId = data['school_id']?.toString() ?? '3898';
@@ -232,16 +249,18 @@ class OfflineSyncControllerEnhanced extends GetxController {
             final bookCode = data['F4_LCODE']?.toString();
             final studentId = data['student_id']?.toString() ?? '';
             final className = data['class']?.toString() ?? '';
-            
+
             print('📋 Raw checkout data from DB:');
             print('   book_id (M1_CODE): $bookId');
             print('   F4_LCODE (book_code): $bookCode');
             print('   teacher_id: $teacherId');
             print('   student_id: $studentId');
             print('   class: $className');
-            
-            _addSyncLog('   📋 Record: teacher=$teacherId, book=$bookCode, student=$studentId');
-            
+
+            _addSyncLog(
+              '   📋 Record: teacher=$teacherId, book=$bookCode, student=$studentId',
+            );
+
             bulkRecords.add({
               'F4_LCODE': bookCode, // ✅ CRITICAL: Book code for API
               'program_id': programId,
@@ -264,7 +283,9 @@ class OfflineSyncControllerEnhanced extends GetxController {
 
       _addSyncLog('📤 ${bulkRecords.length} checkouts API को भेज रहे हैं...');
       _addSyncLog('   Endpoint: /get_checkout_bulk');
-      _addSyncLog('   Fields: F4_LCODE, program_id, school_id, teacher_id, book_id, student_id, class');
+      _addSyncLog(
+        '   Fields: F4_LCODE, program_id, school_id, teacher_id, book_id, student_id, class',
+      );
       _addSyncLog('   Sample: ${bulkRecords.first}');
 
       // Send to API
@@ -277,15 +298,17 @@ class OfflineSyncControllerEnhanced extends GetxController {
         // Mark as synced in database
         for (final transaction in checkoutTransactions) {
           await _offlineDb.markOfflineTransactionSynced(
-              transaction['transaction_id']);
+            transaction['transaction_id'],
+          );
         }
 
         _addSyncLog('✅ Database में सभी checkouts को synced चिह्नित किया');
         return {'synced': syncedCount, 'failed': 0};
       } else {
         _addSyncLog(
-            '❌ Checkouts API असफल: ${result['message']}',
-            isError: true);
+          '❌ Checkouts API असफल: ${result['message']}',
+          isError: true,
+        );
         return {'synced': 0, 'failed': checkoutTransactions.length};
       }
     } catch (e) {
@@ -296,9 +319,12 @@ class OfflineSyncControllerEnhanced extends GetxController {
 
   /// Sync bulk checkins with detailed debugging
   Future<Map<String, int>> _syncBulkCheckins(
-      List<Map<String, dynamic>> checkinTransactions) async {
+    List<Map<String, dynamic>> checkinTransactions,
+  ) async {
     try {
-      _addSyncLog('🔄 ${checkinTransactions.length} checkins तैयार कर रहे हैं...');
+      _addSyncLog(
+        '🔄 ${checkinTransactions.length} checkins तैयार कर रहे हैं...',
+      );
 
       // Prepare bulk data
       final bulkRecords = <Map<String, dynamic>>[];
@@ -342,15 +368,15 @@ class OfflineSyncControllerEnhanced extends GetxController {
         // Mark as synced in database
         for (final transaction in checkinTransactions) {
           await _offlineDb.markCheckinSynced(
-              transaction['transaction_id'], transaction);
+            transaction['transaction_id'],
+            transaction,
+          );
         }
 
         _addSyncLog('✅ Database में सभी checkins को synced चिह्नित किया');
         return {'synced': syncedCount, 'failed': 0};
       } else {
-        _addSyncLog(
-            '❌ Checkins API असफल: ${result['message']}',
-            isError: true);
+        _addSyncLog('❌ Checkins API असफल: ${result['message']}', isError: true);
         return {'synced': 0, 'failed': checkinTransactions.length};
       }
     } catch (e) {
@@ -366,22 +392,24 @@ class OfflineSyncControllerEnhanced extends GetxController {
         title: const Text('सिंक लॉग्स'),
         content: SizedBox(
           width: double.maxFinite,
-          child: Obx(() => ListView.builder(
-            itemCount: syncLogs.length,
-            itemBuilder: (context, index) {
-              final log = syncLogs[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  '${log['timestamp']}: ${log['message']}',
-                  style: TextStyle(
-                    color: log['isError'] ? Colors.red : Colors.black,
-                    fontSize: 12,
+          child: Obx(
+            () => ListView.builder(
+              itemCount: syncLogs.length,
+              itemBuilder: (context, index) {
+                final log = syncLogs[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    '${log['timestamp']}: ${log['message']}',
+                    style: TextStyle(
+                      color: log['isError'] ? Colors.red : Colors.black,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-              );
-            },
-          )),
+                );
+              },
+            ),
+          ),
         ),
         actions: [
           TextButton(

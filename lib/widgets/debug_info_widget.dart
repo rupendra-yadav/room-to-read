@@ -28,10 +28,7 @@ class DebugInfoWidget extends StatelessWidget {
               SizedBox(width: 8),
               Text(
                 'Debug Info',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ],
           ),
@@ -47,15 +44,27 @@ class DebugInfoWidget extends StatelessWidget {
       final authService = Get.find<AuthService>();
       final connectivityService = Get.find<ConnectivityService>();
       final dataPreloader = Get.find<DataPreloaderService>();
-      
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoRow('User', authService.currentUser.value?.name ?? 'Not logged in'),
-          _buildInfoRow('User ID', authService.currentUser.value?.code ?? 'N/A'),
-          _buildInfoRow('Online', connectivityService.isOnline.value ? 'Yes' : 'No'),
+          _buildInfoRow(
+            'User',
+            authService.currentUser.value?.name ?? 'Not logged in',
+          ),
+          _buildInfoRow(
+            'User ID',
+            authService.currentUser.value?.code ?? 'N/A',
+          ),
+          _buildInfoRow(
+            'Online',
+            connectivityService.isOnline.value ? 'Yes' : 'No',
+          ),
           _buildInfoRow('Connection', connectivityService.connectionType.value),
-          _buildInfoRow('Preloading', dataPreloader.isPreloading.value ? 'Yes' : 'No'),
+          _buildInfoRow(
+            'Preloading',
+            dataPreloader.isPreloading.value ? 'Yes' : 'No',
+          ),
           if (dataPreloader.preloadStatus.value.isNotEmpty)
             _buildInfoRow('Status', dataPreloader.preloadStatus.value),
           SizedBox(height: 8),
@@ -115,11 +124,11 @@ class DebugInfoWidget extends StatelessWidget {
     final authService = Get.find<AuthService>();
     final connectivityService = Get.find<ConnectivityService>();
     final offlineDb = Get.find<OfflineDatabaseService>();
-    
+
     try {
       final offlineBooks = await offlineDb.getBooksOffline();
       final stats = await offlineDb.getOfflineStats();
-      
+
       Get.dialog(
         AlertDialog(
           title: Text('Detailed Debug Info'),
@@ -128,22 +137,38 @@ class DebugInfoWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Authentication:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'Authentication:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text('• Logged in: ${authService.isLoggedIn.value}'),
-                Text('• User: ${authService.currentUser.value?.name ?? "None"}'),
-                Text('• User ID: ${authService.currentUser.value?.code ?? "None"}'),
+                Text(
+                  '• User: ${authService.currentUser.value?.name ?? "None"}',
+                ),
+                Text(
+                  '• User ID: ${authService.currentUser.value?.code ?? "None"}',
+                ),
                 SizedBox(height: 12),
-                Text('Connectivity:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'Connectivity:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text('• Online: ${connectivityService.isOnline.value}'),
                 Text('• Type: ${connectivityService.connectionType.value}'),
                 SizedBox(height: 12),
-                Text('Offline Database:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'Offline Database:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text('• Books stored: ${offlineBooks.length}'),
                 Text('• Students: ${stats['students'] ?? 0}'),
                 Text('• Classes: ${stats['classes'] ?? 0}'),
                 if (offlineBooks.isNotEmpty) ...[
                   SizedBox(height: 8),
-                  Text('Sample book:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Sample book:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   Text('• Name: ${offlineBooks.first['name'] ?? "N/A"}'),
                   Text('• Code: ${offlineBooks.first['code'] ?? "N/A"}'),
                   Text('• Author: ${offlineBooks.first['lname'] ?? "N/A"}'),
@@ -152,10 +177,7 @@ class DebugInfoWidget extends StatelessWidget {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child: Text('Close'),
-            ),
+            TextButton(onPressed: () => Get.back(), child: Text('Close')),
           ],
         ),
       );
@@ -166,32 +188,39 @@ class DebugInfoWidget extends StatelessWidget {
 
   Future<void> _testApiDirectly() async {
     try {
-      Get.snackbar('Testing', 'Running API test...', duration: Duration(seconds: 2));
-      
+      Get.snackbar(
+        'Testing',
+        'Running API test...',
+        duration: Duration(seconds: 2),
+      );
+
       final authService = Get.find<AuthService>();
       final currentUser = authService.currentUser.value;
-      
+
       if (currentUser == null) {
         Get.snackbar('Error', 'No user logged in');
         return;
       }
-      
+
       // Import and test API service directly
       final apiService = Get.find<ApiService>();
-      
+
       print('🧪 Direct API test starting...');
       final books = await apiService.getBooks(userId: currentUser.code);
       print('🧪 Direct API test result: ${books.length} books');
-      
+
       Get.snackbar(
-        'API Test Result', 
+        'API Test Result',
         'Found ${books.length} books',
         duration: Duration(seconds: 3),
       );
-      
     } catch (e) {
       print('🧪 Direct API test failed: $e');
-      Get.snackbar('API Test Failed', e.toString(), duration: Duration(seconds: 5));
+      Get.snackbar(
+        'API Test Failed',
+        e.toString(),
+        duration: Duration(seconds: 5),
+      );
     }
   }
 }
