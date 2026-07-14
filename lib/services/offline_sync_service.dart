@@ -209,6 +209,17 @@ class OfflineSyncService extends GetxService {
 
       syncStatus.value = 'ऑफलाइन सिंक पूरा हुआ';
 
+      final pendingLevels = await _offlineDb.getPendingReadingLevelUpdates();
+for (final u in pendingLevels) {
+  try {
+    final r = await _apiService.updateReadingLevel(u['student_code'], u['new_level']);
+    if (r['success'] == true) {
+      await _offlineDb.markReadingLevelUpdateSynced(u['id']);
+      totalSuccessCount++;
+    }
+  } catch (_) {}
+}
+
       // ✅ Mark sync as completed for listeners
       if (totalSuccessCount > 0) {
         lastSyncCompletedAt.value = DateTime.now();
@@ -988,27 +999,37 @@ class OfflineSyncService extends GetxService {
       syncStatus.value = 'छात्र डेटा डाउनलोड हो रहा है...';
       final students = await _apiService.getStudents(group1: userId);
       if (students.isNotEmpty) {
+        final db = await _offlineDb.database;
+        final localRows = await db.query('students');
+        final localMap = {for (var r in localRows) r['code']: r};
+
         await _offlineDb.saveStudentsOffline(
-          students
-              .map(
-                (s) => {
-                  'id': s['M1_CODE']?.toString() ?? '',
-                  'code': s['M1_CODE']?.toString() ?? '',
-                  'name': s['M1_NAME']?.toString() ?? '',
-                  'className': s['M1_GROUP2N']?.toString() ?? '',
-                  'readingLevel':
-                      int.tryParse(s['M1_TXT2']?.toString() ?? '') ?? 0,
-                  'currentLevel':
-                      int.tryParse(s['M1_TXT2']?.toString() ?? '') ?? 0,
-                  'booksIssued': 0,
-                  'lastUpdated': DateTime.now().toIso8601String(),
-                  'previousLevel':
-                      int.tryParse(s['M1_TXT1']?.toString() ?? '') ?? 0,
-                  'teacherId': s['M1_GROUP2']?.toString() ?? '',
-                  'rawData': jsonEncode(s),
-                },
-              )
-              .toList(),
+          students.map((s) {
+            final code = s['M1_CODE']?.toString() ?? '';
+            final local = localMap[code];
+            return {
+              'id': code,
+              'code': code,
+              'name': s['M1_NAME']?.toString() ?? '',
+              'className': s['M1_GROUP2N']?.toString() ?? '',
+              'readingLevel':
+                  local?['readingLevel'] ??
+                  int.tryParse(s['M1_TXT2']?.toString() ?? '') ??
+                  0,
+              'currentLevel':
+                  local?['currentLevel'] ??
+                  int.tryParse(s['M1_TXT2']?.toString() ?? '') ??
+                  0,
+              'previousLevel':
+                  local?['previousLevel'] ??
+                  int.tryParse(s['M1_TXT1']?.toString() ?? '') ??
+                  0,
+              'booksIssued': 0,
+              'lastUpdated': DateTime.now().toIso8601String(),
+              'teacherId': s['M1_GROUP2']?.toString() ?? '',
+              'rawData': jsonEncode(s),
+            };
+          }).toList(),
         );
         totalItems += students.length;
       }

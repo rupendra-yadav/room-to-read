@@ -1081,12 +1081,18 @@ class OfflineDatabaseService extends GetxService {
           'readingLevel':
               int.tryParse(student['readingLevel']?.toString() ?? '0') ?? 0,
           'currentLevel':
-              int.tryParse(student['currentLevel']?.toString() ?? '0') ?? 0,
+              int.tryParse(
+                student['currentLevel']?.toString() ??
+                    student['readingLevel']?.toString() ??
+                    '0',
+              ) ??
+              0,
           'booksIssued':
               int.tryParse(student['booksIssued']?.toString() ?? '0') ?? 0,
           'lastUpdated':
               student['lastUpdated'] ?? DateTime.now().toIso8601String(),
           'teacherId': student['teacherId'] ?? student['M1_GROUP2'] ?? '',
+          'previousLevel': student['previousLevel'] ?? 0,
           'rawData': jsonEncode(student),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }

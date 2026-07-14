@@ -24,10 +24,6 @@ class StudentController extends GetxController {
   void onInit() {
     super.onInit();
     apiService = Get.find<HybridApiService>();
-    final connectivityService = Get.find<ConnectivityService>();
-    ever(connectivityService.isOnline, (bool isOnline) {
-      if (isOnline) syncPendingReadingLevelUpdates();
-    });
     loadStudents();
   }
 
@@ -325,6 +321,19 @@ class StudentController extends GetxController {
         applyFilters();
       }
 
+      await offlineDb.database.then(
+        (db) => db.update(
+          'students',
+          {
+            'readingLevel': newLevel,
+            'previousLevel': oldLevel,
+            'currentLevel': newLevel,
+          },
+          where: 'code = ?',
+          whereArgs: [studentCode],
+        ),
+      );
+
       if (connectivityService.isOnline.value) {
         await _sendReadingLevelToApi(studentCode, newLevel);
         print('✅ Reading level updated online for: $studentCode');
@@ -349,31 +358,22 @@ class StudentController extends GetxController {
   }
 
   Future<void> _sendReadingLevelToApi(String studentCode, int newLevel) async {
-    try {
-      final apiService = Get.find<ApiService>();
-      final currentUser = _authService.currentUser.value;
+    final result = await Get.find<ApiService>().updateReadingLevel(
+      studentCode,
+      newLevel,
+    );
+    if (result['success'] != true) throw Exception(result['message']);
+  }
 
-      // Replace with your actual API endpoint and params
-      final connect = GetConnect(timeout: const Duration(seconds: 30));
-      final formData = FormData({});
-      formData.fields.add(MapEntry('student_code', studentCode));
-      formData.fields.add(MapEntry('reading_level', newLevel.toString()));
-      if (currentUser != null) {
-        formData.fields.add(MapEntry('user_id', currentUser.code));
-      }
-
-      final response = await connect.post(
-        'YOUR_READING_LEVEL_API_ENDPOINT',
-        formData,
+  void updateStudentLevelLocally(String code, int newLevel, int oldLevel) {
+    final i = students.indexWhere((s) => s.code == code);
+    if (i != -1) {
+      students[i] = students[i].copyWith(
+        readingLevel: newLevel,
+        previousLevel: oldLevel,
+        currentLevel: newLevel,
       );
-
-      if (response.statusCode != 200) {
-        throw Exception('API error: ${response.statusCode}');
-      }
-      print('✅ Reading level sent to API: $studentCode → $newLevel');
-    } catch (e) {
-      print('❌ Error sending reading level to API: $e');
-      rethrow;
+      applyFilters();
     }
   }
 

@@ -255,55 +255,55 @@ class EnhancedOfflineService extends GetxService {
   }
 
   // Enhanced Reading Level Update - Fully Offline Capable
-  Future<Map<String, dynamic>> updateReadingLevel(
-    String studentCode,
-    int newReadingLevel,
-  ) async {
-    try {
-      print('📈 Enhanced Offline: Updating reading level');
-      print('   Student: $studentCode, New Level: $newReadingLevel');
+  // Future<Map<String, dynamic>> updateReadingLevel(
+  //   String studentCode,
+  //   int newReadingLevel,
+  // ) async {
+  //   try {
+  //     print('📈 Enhanced Offline: Updating reading level');
+  //     print('   Student: $studentCode, New Level: $newReadingLevel');
 
-      // Get current student data
-      final students = await _offlineDb.getStudentsOffline();
-      final student = students.firstWhere(
-        (s) => s['code'] == studentCode,
-        orElse: () => <String, dynamic>{},
-      );
+  //     // Get current student data
+  //     final students = await _offlineDb.getStudentsOffline();
+  //     final student = students.firstWhere(
+  //       (s) => s['code'] == studentCode,
+  //       orElse: () => <String, dynamic>{},
+  //     );
 
-      final oldLevel = student['readingLevel'] ?? 0;
+  //     final oldLevel = student['readingLevel'] ?? 0;
 
-      // Save offline reading level update
-      await _offlineDb.saveOfflineReadingLevelUpdate(
-        studentCode: studentCode,
-        oldLevel: oldLevel,
-        newLevel: newReadingLevel,
-      );
+  //     // Save offline reading level update
+  //     await _offlineDb.saveOfflineReadingLevelUpdate(
+  //       studentCode: studentCode,
+  //       oldLevel: oldLevel,
+  //       newLevel: newReadingLevel,
+  //     );
 
-      // Update student data locally
-      await _updateStudentReadingLevelLocally(
-        studentCode,
-        newReadingLevel,
-        oldLevel,
-      );
+  //     // Update student data locally
+  //     await _updateStudentReadingLevelLocally(
+  //       studentCode,
+  //       newReadingLevel,
+  //       oldLevel,
+  //     );
 
-      _updatePendingTransactions();
+  //     _updatePendingTransactions();
 
-      final message = isOfflineMode.value
-          ? 'ऑफलाइन रीडिंग लेवल अपडेट - सिंक के लिए इंतजार में'
-          : 'रीडिंग लेवल अपडेट हुआ';
+  //     final message = isOfflineMode.value
+  //         ? 'ऑफलाइन रीडिंग लेवल अपडेट - सिंक के लिए इंतजार में'
+  //         : 'रीडिंग लेवल अपडेट हुआ';
 
-      print('✅ Enhanced Offline: Reading level updated');
+  //     print('✅ Enhanced Offline: Reading level updated');
 
-      return {
-        'success': true,
-        'message': message,
-        'offline': isOfflineMode.value,
-      };
-    } catch (e) {
-      print('❌ Enhanced Offline: Reading level update error: $e');
-      return {'success': false, 'message': 'रीडिंग लेवल अपडेट में त्रुटि: $e'};
-    }
-  }
+  //     return {
+  //       'success': true,
+  //       'message': message,
+  //       'offline': isOfflineMode.value,
+  //     };
+  //   } catch (e) {
+  //     print('❌ Enhanced Offline: Reading level update error: $e');
+  //     return {'success': false, 'message': 'रीडिंग लेवल अपडेट में त्रुटि: $e'};
+  //   }
+  // }
 
   // ✅ CRITICAL FIX: Get Checked Out Books - Include Both Synced and Unsynced
   // This is the main fix for the offline books not displaying issue
@@ -1333,28 +1333,28 @@ class EnhancedOfflineService extends GetxService {
     }
   }
 
-  Future<void> _updateStudentReadingLevelLocally(
-    String studentCode,
-    int newLevel,
-    int oldLevel,
-  ) async {
-    try {
-      final db = await _offlineDb.database;
+  // Future<void> _updateStudentReadingLevelLocally(
+  //   String studentCode,
+  //   int newLevel,
+  //   int oldLevel,
+  // ) async {
+  //   try {
+  //     final db = await _offlineDb.database;
 
-      await db.rawUpdate(
-        '''
-        UPDATE students 
-        SET readingLevel = ?, previousLevel = ?, lastUpdated = ?
-        WHERE code = ?
-      ''',
-        [newLevel, oldLevel, DateTime.now().toIso8601String(), studentCode],
-      );
+  //     await db.rawUpdate(
+  //       '''
+  //       UPDATE students 
+  //       SET readingLevel = ?, previousLevel = ?, lastUpdated = ?
+  //       WHERE code = ?
+  //     ''',
+  //       [newLevel, oldLevel, DateTime.now().toIso8601String(), studentCode],
+  //     );
 
-      print('✅ Student reading level updated locally');
-    } catch (e) {
-      print('❌ Error updating student reading level: $e');
-    }
-  }
+  //     print('✅ Student reading level updated locally');
+  //   } catch (e) {
+  //     print('❌ Error updating student reading level: $e');
+  //   }
+  // }
 
   Future<void> _updatePendingTransactions() async {
     try {
