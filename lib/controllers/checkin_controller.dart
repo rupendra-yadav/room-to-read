@@ -358,7 +358,7 @@ class CheckinController extends GetxController {
     } catch (e) {}
   }
 
-  Future<Map<String, dynamic>> completeCheckin(String condition) async {
+Future<Map<String, dynamic>> completeCheckin(String condition) async {
     final record = selectedRecord.value;
     final user = _authService.currentUser.value;
 
@@ -385,35 +385,43 @@ class CheckinController extends GetxController {
           ? '3'
           : '4';
 
-      // Extract core data from record - prioritize rawData, then direct fields
-      print('\n🔍 ========== EXTRACTING BOOK CODE ==========');
+      print('\n🔍 ========== EXTRACTING IDENTIFIERS ==========');
       print('   rawData F4_LCODE: ${rawData?['F4_LCODE']}');
       print('   record F4_LCODE: ${record['F4_LCODE']}');
-      print('   record bookCode: ${record['bookCode']}');
-      print('   record bookId: ${record['bookId']}');
+      print('   rawData F4_PARTY: ${rawData?['F4_PARTY']}');
+      print('   record F4_PARTY: ${record['F4_PARTY']}');
       print('   record keys: ${record.keys.toList()}');
 
-      // ✅ CRITICAL FIX: F4_LCODE is the book code (M1_CODE), NOT a numeric ID
-      // Extract it first from rawData, then from record fields
-      var bookCode =
+      // ⚠️ F4_LCODE is the CHECKOUT TRANSACTION'S OWN LINE CODE.
+      // It exists ONLY to be echoed back as F4_STAT so the backend can link
+      // this checkin to the checkout row it closes. It is NEVER a book
+      // identifier and must never be used to look up a book.
+      var transactionLcode =
           rawData?['F4_LCODE']?.toString() ??
           record['F4_LCODE']?.toString() ??
-          record['bookCode']?.toString() ??
           '';
 
-      print('   ✅ Selected bookCode (F4_LCODE): "$bookCode"');
+      print('   ✅ transactionLcode (→ F4_STAT link): "$transactionLcode"');
 
-      // ✅ CRITICAL: Do NOT use 'bookId' from record as fallback for bookCode
-      // 'bookId' in the record is often wrong (set to numeric ID incorrectly)
-      // We should NEVER use it as bookCode - it will be sent as F4_LCODE to API
-      if (bookCode.isEmpty) {
-        // Only use bookId as ABSOLUTE last resort, but mark it as suspicious
-        bookCode = record['bookId']?.toString() ?? '';
-        if (bookCode.isNotEmpty) {
+      // ✅ F4_PARTY is the REAL book code (M1_CODE) on the checkout row.
+      // This is what must be used for the Book-model lookup and ultimately
+      // sent on as F4_PARTY on the checkin row.
+      var realBookCode =
+          rawData?['F4_PARTY']?.toString() ??
+          record['F4_PARTY']?.toString() ??
+          record['bookCode']?.toString() ?? // legacy fallback only
+          '';
+
+      print('   ✅ realBookCode (F4_PARTY): "$realBookCode"');
+
+      if (realBookCode.isEmpty) {
+        // Last-resort fallback only — bookId is sometimes misconfigured,
+        // so this is logged loudly rather than trusted silently.
+        realBookCode = record['bookId']?.toString() ?? '';
+        if (realBookCode.isNotEmpty) {
           print(
-            '   ⚠️ WARNING: bookCode was empty, falling back to record[bookId]: "$bookCode"',
+            '   ⚠️ WARNING: realBookCode was empty, falling back to record[bookId]: "$realBookCode"',
           );
-          print('   ⚠️ This might be wrong! bookId is often misconfigured.');
         }
       }
       print('===================================================\n');
@@ -438,31 +446,31 @@ class CheckinController extends GetxController {
           record['className']?.toString() ??
           '';
 
-      // Also print the initial studentId before lookup
-      final studentId =
+      // ✅ Prefer the real student code straight from the record/rawData
+      // (F4_PARTY1) now that the PHP side exposes it. Name-matching below
+      // is only a fallback for old cached records that predate this field.
+      var studentId =
+          rawData?['F4_PARTY1']?.toString() ??
+          record['F4_PARTY1']?.toString() ??
           record['student_id']?.toString() ??
           record['M1_CODE']?.toString() ??
           record['studentId']?.toString() ??
           '';
 
-      // Print raw record structure for diagnosis
-      record.forEach((key, value) {});
+      print('   studentId (F4_PARTY1 preferred): "$studentId"');
 
-      // ✅ NEW: Idempotency check - verify book is not already checked in
-      // This prevents duplicate check-ins if the user taps checkin multiple times
-      // CRITICAL FIX: Check by BOTH book code AND student to allow same book to be checked in by different students
+      // Idempotency check — keyed on the real book code + student, not the
+      // transaction line code.
       final offlineDb = Get.find<OfflineDatabaseService>();
 
-      // Check 1: Already synced checkin in the last 24 hours
-      // Get pending transactions to check for recent check-ins
       final pendingTransactions = await offlineDb
           .getPendingOfflineTransactions();
       final recentCheckins = pendingTransactions.where((t) {
-        // ✅ CRITICAL FIX: Match by BOTH book_code AND student_id
         if (t['transaction_type'] != 'checkin' ||
-            t['book_code'] != bookCode ||
-            t['student_id'] != studentId) // ✅ Also check student
+            t['book_code'] != realBookCode ||
+            t['student_id'] != studentId) {
           return false;
+        }
         final transactionDate = DateTime.tryParse(
           t['transaction_date']?.toString() ?? '',
         );
@@ -478,84 +486,65 @@ class CheckinController extends GetxController {
         };
       }
 
-      // Debug book lookup
-      await debugBookLookup(bookCode);
+      await debugBookLookup(realBookCode);
 
       // ===== GET CORRECT BOOK_ID FROM BOOK MODEL =====
-      String finalBookId = bookCode; // fallback to book code if lookup fails
+      // fallback to the real book code if lookup fails — NOT the transaction lcode
+      String finalBookId = realBookCode;
 
       try {
-        // Try to get HybridApiService - this might be the issue
         HybridApiService? hybridApiService;
         try {
           hybridApiService = Get.find<HybridApiService>();
         } catch (e) {
-          // Fallback to ApiService directly
           final apiService = Get.find<ApiService>();
           final rawBooks = await apiService.getBooks(userId: user.code);
 
           if (rawBooks.isNotEmpty) {
-            // Convert raw data to Book objects manually
             final books = rawBooks.map((data) => Book.fromJson(data)).toList();
 
-            // Look for matching book
             for (final book in books) {
-              if (book.bookCode == bookCode) {
-                finalBookId = book
-                    .bookId; // ✅ FIXED: Use bookId (M1_NO) not bookCode (M1_CODE)
+              if (book.bookCode == realBookCode) {
+                finalBookId = book.bookId;
                 break;
               }
             }
+          }
 
-            if (finalBookId == bookCode) {
-              books.map((b) => b.bookCode).take(10).toList();
-            }
-          } else {}
-
-          // Skip the rest of the hybrid service logic
           throw Exception('Using ApiService fallback');
         }
 
         final books = await hybridApiService.getBooks(userId: user.code);
 
         if (books.isNotEmpty) {
-          // Debug: Show sample of available books
-          for (int i = 0; i < (books.length > 5 ? 5 : books.length); i++) {}
-
-          // Find the book with matching code OR name
           Book? targetBook;
 
-          // Try exact match on code first
           for (final book in books) {
-            if (book.bookCode == bookCode) {
+            if (book.bookCode == realBookCode) {
               targetBook = book;
               break;
             }
           }
 
-          // If no exact match, try case-insensitive on code
           if (targetBook == null) {
             for (final book in books) {
-              if (book.bookCode.toLowerCase() == bookCode.toLowerCase()) {
+              if (book.bookCode.toLowerCase() == realBookCode.toLowerCase()) {
                 targetBook = book;
                 break;
               }
             }
           }
 
-          // If still no match, try trimmed comparison on code
           if (targetBook == null) {
             for (final book in books) {
-              if (book.bookCode.trim() == bookCode.trim()) {
+              if (book.bookCode.trim() == realBookCode.trim()) {
                 targetBook = book;
                 break;
               }
             }
           }
 
-          // If code didn't work, try matching by book name (for offline records with wrong codes)
           if (targetBook == null && bookName.isNotEmpty) {
-            // Try exact name match first
             for (final book in books) {
               if (book.bookName == bookName) {
                 targetBook = book;
@@ -563,7 +552,6 @@ class CheckinController extends GetxController {
               }
             }
 
-            // Try case-insensitive name match
             if (targetBook == null) {
               for (final book in books) {
                 if (book.bookName.toLowerCase() == bookName.toLowerCase()) {
@@ -573,15 +561,10 @@ class CheckinController extends GetxController {
               }
             }
 
-            // Try partial name match (for books with slight name variations)
             if (targetBook == null) {
               for (final book in books) {
-                if (book.bookName.toLowerCase().contains(
-                      bookName.toLowerCase(),
-                    ) ||
-                    bookName.toLowerCase().contains(
-                      book.bookName.toLowerCase(),
-                    )) {
+                if (book.bookName.toLowerCase().contains(bookName.toLowerCase()) ||
+                    bookName.toLowerCase().contains(book.bookName.toLowerCase())) {
                   targetBook = book;
                   break;
                 }
@@ -590,33 +573,13 @@ class CheckinController extends GetxController {
           }
 
           if (targetBook != null) {
-            // Successfully found the book - extract the book_id (M1_NO, NOT M1_CODE)
-            finalBookId = targetBook
-                .bookId; // ✅ FIXED: Use bookId (M1_NO) not bookCode (M1_CODE)
-          } else {
-            // Book not found - show available codes for debugging
-            books.map((b) => b.bookCode).take(20).toList();
+            finalBookId = targetBook.bookId;
           }
-        } else {}
+        }
       } catch (e) {}
 
-      // Validate that we have different values (this is the key requirement)
-      if (finalBookId == bookCode) {
-        print(
-          '   ⚠️ finalBookId == bookCode ("$finalBookId"), no Book model found',
-        );
-      } else {
-        print(
-          '   ✅ finalBookId ("$finalBookId") differs from bookCode ("$bookCode")',
-        );
-      }
-
-      // ✅ CRITICAL SAFETY CHECK: Validate finalBookId exists in books list
-      // If finalBookId doesn't match ANY book in the system, it's wrong value
       print('\n🔍 ========== VALIDATING FINAL BOOK ID ==========');
-      print(
-        '   Checking if finalBookId="$finalBookId" matches any book in system...',
-      );
+      print('   Checking if finalBookId="$finalBookId" matches any book in system...');
 
       try {
         final hybridApiService = Get.find<HybridApiService>();
@@ -626,179 +589,106 @@ class CheckinController extends GetxController {
           (book) => book.bookId == finalBookId || book.bookCode == finalBookId,
         );
 
-        if (isValidBookId) {
-          print('   ✅ VALID: finalBookId="$finalBookId" found in books list');
-        } else {
+        if (!isValidBookId) {
           print(
-            '   ❌ INVALID: finalBookId="$finalBookId" NOT found in books list',
+            '   ❌ INVALID: finalBookId="$finalBookId" NOT found in books list. Falling back to realBookCode: "$realBookCode"',
           );
-          print(
-            '      This is suspicious! Falling back to bookCode: "$bookCode"',
-          );
-
-          // If finalBookId is not valid, use bookCode instead
-          finalBookId = bookCode;
-          print('   ✅ Using bookCode as finalBookId: "$finalBookId"');
+          finalBookId = realBookCode; // ✅ fixed: was `bookCode` before
         }
       } catch (e) {
         print('   ⚠️ Could not validate finalBookId: $e');
-        print('      Proceeding with Current value: "$finalBookId"');
       }
 
       print('===================================================');
 
-      // ===== GET STUDENT_ID FROM RECORD =====
-      // For checkin records, extract the student code from the Student model
-      // The student code is what the API expects, not the system ID
-      String finalStudentId =
-          record['student_id']?.toString() ??
-          record['M1_CODE']?.toString() ??
-          record['studentId']?.toString() ??
-          '';
+      // ===== STUDENT NAME-MATCH FALLBACK (only if F4_PARTY1 was missing) =====
+      String actualStudentName = studentName;
 
-      // Always try to look up by student name to get the correct student code from Student model
-      // This is crucial for checkin because the record might not have the correct student code
-      if (studentName.isNotEmpty) {
+      if (studentId.isEmpty && studentName.isNotEmpty) {
         try {
-          // First, try to get StudentController if it's available
           StudentController? studentCtrl;
           try {
             studentCtrl = Get.find<StudentController>();
-
-            if (studentCtrl.students.isEmpty) {
-              studentCtrl = null; // Force API fallback
-            }
+            if (studentCtrl.students.isEmpty) studentCtrl = null;
           } catch (e) {}
 
           if (studentCtrl != null && studentCtrl.students.isNotEmpty) {
-            for (final s in studentCtrl.students.take(5)) {}
+            final normalizedSearchName =
+                studentName.trim().replaceAll(RegExp(r'\s+'), ' ');
 
-            // Normalize the search name (trim spaces, remove extra whitespace)
-            final normalizedSearchName = studentName.trim().replaceAll(
-              RegExp(r'\s+'),
-              ' ',
-            );
-
-            // Search for student by name in the loaded students list (exact match first)
             final matchingStudents = studentCtrl.students.where((s) {
-              final normalizedStudentName = s.name.trim().replaceAll(
-                RegExp(r'\s+'),
-                ' ',
-              );
+              final normalizedStudentName =
+                  s.name.trim().replaceAll(RegExp(r'\s+'), ' ');
               return normalizedStudentName.toLowerCase() ==
                   normalizedSearchName.toLowerCase();
             }).toList();
 
             if (matchingStudents.isNotEmpty) {
-              final matchedStudent = matchingStudents[0];
-              finalStudentId =
-                  matchedStudent.code; // ✅ Extract code from Student model
+              studentId = matchingStudents[0].code;
             } else {
-              // Try partial match if exact match fails
-              final normalizedSearchName = studentName.trim().toLowerCase();
+              final normalizedLower = studentName.trim().toLowerCase();
               final partialMatches = studentCtrl.students.where((s) {
-                final normalizedName = s.name.trim().toLowerCase();
-                return normalizedName.contains(normalizedSearchName) ||
-                    normalizedSearchName.contains(normalizedName);
+                final n = s.name.trim().toLowerCase();
+                return n.contains(normalizedLower) || normalizedLower.contains(n);
               }).toList();
-
               if (partialMatches.isNotEmpty) {
-                final matchedStudent = partialMatches[0];
-                finalStudentId =
-                    matchedStudent.code; // ✅ Extract code from Student model
-              } else {
-                for (final s in studentCtrl.students.take(10)) {}
+                studentId = partialMatches[0].code;
               }
             }
-          } else if (studentCtrl == null && finalStudentId.isEmpty) {
-            // StudentController not available and no direct student_id - try to load from API
+          } else if (studentCtrl == null) {
             try {
-              final studentsFromApi = await apiService.getStudents(
-                group1: user.code,
-              );
-
+              final studentsFromApi = await apiService.getStudents(group1: user.code);
               if (studentsFromApi.isNotEmpty) {
-                for (final s in studentsFromApi.take(5)) {}
+                final normalizedSearchName =
+                    studentName.trim().replaceAll(RegExp(r'\s+'), ' ');
 
-                // Normalize the search name (trim spaces, remove extra whitespace)
-                final normalizedSearchName = studentName.trim().replaceAll(
-                  RegExp(r'\s+'),
-                  ' ',
-                );
-
-                // Search for student by name in the loaded students list
                 final matchingStudents = studentsFromApi.where((s) {
-                  final normalizedStudentName = s.name.trim().replaceAll(
-                    RegExp(r'\s+'),
-                    ' ',
-                  );
-                  return normalizedStudentName.toLowerCase() ==
-                      normalizedSearchName.toLowerCase();
+                  final n = s.name.trim().replaceAll(RegExp(r'\s+'), ' ');
+                  return n.toLowerCase() == normalizedSearchName.toLowerCase();
                 }).toList();
 
                 if (matchingStudents.isNotEmpty) {
-                  final matchedStudent = matchingStudents[0];
-                  finalStudentId =
-                      matchedStudent.code; // ✅ Extract code from Student model
+                  studentId = matchingStudents[0].code;
                 } else {
-                  // Try partial match if exact match fails
-                  final normalizedSearchName = studentName.trim().toLowerCase();
+                  final normalizedLower = studentName.trim().toLowerCase();
                   final partialMatches = studentsFromApi.where((s) {
-                    final normalizedName = s.name.trim().toLowerCase();
-                    return normalizedName.contains(normalizedSearchName) ||
-                        normalizedSearchName.contains(normalizedName);
+                    final n = s.name.trim().toLowerCase();
+                    return n.contains(normalizedLower) || normalizedLower.contains(n);
                   }).toList();
-
                   if (partialMatches.isNotEmpty) {
-                    final matchedStudent = partialMatches[0];
-                    finalStudentId = matchedStudent
-                        .code; // ✅ Extract code from Student model
-                  } else {
-                    for (final s in studentsFromApi.take(10)) {}
+                    studentId = partialMatches[0].code;
                   }
                 }
               }
-              // ignore: empty_catches
             } catch (apiError) {}
           }
-          // ignore: empty_catches
         } catch (e) {}
       }
 
-      String actualStudentName = studentName;
-
-      // Validation: Make sure we have a valid student ID
-      if (finalStudentId.isEmpty) {
-        // Try to get student ID from offline database checked_out_books table
+      // Last-resort: offline DB lookup, keyed on the REAL book code, not F4_LCODE
+      if (studentId.isEmpty) {
         try {
           final offlineDb = Get.find<OfflineDatabaseService>();
           final db = await offlineDb.database;
 
-          // Query checked_out_books table for this specific book
-          final bookCode = record['F4_LCODE']?.toString() ?? '';
           final storedBooks = await db.query(
             'checked_out_books',
             where: 'teacherId = ? AND bookCode = ?',
-            whereArgs: [user.code, bookCode],
+            whereArgs: [user.code, realBookCode], // ✅ fixed: was F4_LCODE
           );
 
           if (storedBooks.isNotEmpty) {
-            // Get the first matching book's student ID
             final storedBook = storedBooks.first;
-            finalStudentId = storedBook['studentId']?.toString() ?? '';
-            final storedStudentName =
-                storedBook['studentName']?.toString() ?? '';
-
-            if (finalStudentId.isNotEmpty) {
-              actualStudentName = storedStudentName.isNotEmpty
-                  ? storedStudentName
-                  : studentName;
-            } else {}
-          } else {}
+            studentId = storedBook['studentId']?.toString() ?? '';
+            final storedStudentName = storedBook['studentName']?.toString() ?? '';
+            if (studentId.isNotEmpty) {
+              actualStudentName =
+                  storedStudentName.isNotEmpty ? storedStudentName : studentName;
+            }
+          }
         } catch (dbError) {}
 
-        // If still no student ID, this is a critical error
-        if (finalStudentId.isEmpty) {
+        if (studentId.isEmpty) {
           return {
             'success': false,
             'message':
@@ -807,198 +697,95 @@ class CheckinController extends GetxController {
         }
       }
 
-      // Use HybridApiService for proper offline handling
+      final finalStudentId = studentId;
+
       print('\n📚 ========== CHECKIN online: PREPARING SUBMISSION ==========');
       print('🎯 CHECKIN PARAMETERS:');
-      print('   📖 Book Code (F4_LCODE): $bookCode');
+      print('   🔗 Transaction Lcode (→ F4_STAT): $transactionLcode');
+      print('   📖 Real Book Code (F4_PARTY): $realBookCode');
       print('   🏷️  Book ID (M1_NO): $finalBookId');
       print('   👤 Student ID: $finalStudentId');
       print('   👤 Student Name: $actualStudentName');
-      print('   📝 Book Name: $bookName');
-      print('   📊 Transaction Code: $transactionCode');
-      print('   teacherId: ${user.code}');
-      print('   className: $className');
-      print('   programId: ${user.group}');
-      print('   schoolId: ${user.group1}');
       print('===================================================');
 
       final result = await apiService.checkin(
         bookTransactionCode: transactionCode, // F4_BT
-        bookCode: bookCode, // F4_LCODE (primary)
-        programId: user.group, // ✅ M1_GROUP = program_id
-        schoolId: user.group1, // ✅ M1_GROUP1 = school_id
-        teacherId: user.code, // teacher_id
-        bookId: finalBookId, // book_id (from Book model lookup)
-        studentId: finalStudentId, // student_id (from Student model lookup)
-        studentName: actualStudentName, // ✅ Pass student name for display
-        className: className, // class
-        bookName: bookName, // Pass book name for matching
+        bookCode: transactionLcode, // ✅ F4_LCODE — used ONLY to build F4_STAT
+        programId: user.group,
+        schoolId: user.group1,
+        teacherId: user.code,
+        bookId: finalBookId, // → F4_PARTY (via PHP book_id param)
+        studentId: finalStudentId, // → F4_PARTY1
+        studentName: actualStudentName,
+        className: className,
+        bookName: bookName,
       );
 
       if (result['success'] == true) {
-        // ✅ CRITICAL FIX: Match by BOTH book code AND student to remove only this student's checkout
-        // This prevents removing all instances of the same book when multiple students have it
         final bookCodeToRemove =
-            record['F4_LCODE'] ?? record['bookCode'] ?? bookCode;
+            record['F4_LCODE'] ?? record['bookCode'] ?? transactionLcode;
         final studentNameToRemove = actualStudentName;
         final studentIdToRemove = finalStudentId;
 
-        print('\n📚 ========== REMOVING BOOK FROM CHECKIN LIST ==========');
-        print('   Book Code: $bookCodeToRemove');
-        print('   Student Name: $studentNameToRemove');
-        print('   Student ID: $studentIdToRemove');
-        print('   Current list size: ${checkedOutBooks.length}');
-
-        // ✅ IMPROVED: Use explicit list reconstruction instead of removeWhere
-        // This ensures the observable list change is properly detected
-        // CRITICAL: Match BOTH book code AND student name/ID
         final updatedBooks = checkedOutBooks.where((item) {
           final itemCode = item['F4_LCODE'] ?? item['bookCode'] ?? '';
-          final itemStudentName =
-              item['F4_PARTY1N'] ?? item['studentName'] ?? '';
+          final itemStudentName = item['F4_PARTY1N'] ?? item['studentName'] ?? '';
           final itemStudentId = item['studentId'] ?? '';
-
-          // Match only if BOTH book code AND student match
-          final bookMatches = itemCode == bookCodeToRemove;
-          final studentMatches =
-              itemStudentName == studentNameToRemove ||
-              itemStudentId == studentIdToRemove;
-          final matches = bookMatches && studentMatches;
-
-          if (matches) {
-            print('   ✅ MATCHED: $itemCode - $itemStudentName (removing)');
-          }
+          final matches = itemCode == bookCodeToRemove &&
+              (itemStudentName == studentNameToRemove ||
+                  itemStudentId == studentIdToRemove);
           return !matches;
         }).toList();
-
-        int removedCount = checkedOutBooks.length - updatedBooks.length;
-        print('   Removed: $removedCount books');
-        print('   New list size: ${updatedBooks.length}');
-
         checkedOutBooks.value = updatedBooks;
 
-        // Update filteredRecords with the same list
         final updatedFiltered = filteredRecords.where((item) {
           final itemCode = item['F4_LCODE'] ?? item['bookCode'] ?? '';
-          final itemStudentName =
-              item['F4_PARTY1N'] ?? item['studentName'] ?? '';
+          final itemStudentName = item['F4_PARTY1N'] ?? item['studentName'] ?? '';
           final itemStudentId = item['studentId'] ?? '';
-
-          // Match only if BOTH book code AND student match
-          final bookMatches = itemCode == bookCodeToRemove;
-          final studentMatches =
-              itemStudentName == studentNameToRemove ||
-              itemStudentId == studentIdToRemove;
-          final matches = bookMatches && studentMatches;
-
+          final matches = itemCode == bookCodeToRemove &&
+              (itemStudentName == studentNameToRemove ||
+                  itemStudentId == studentIdToRemove);
           return !matches;
         }).toList();
-
-        int removedFilteredCount =
-            filteredRecords.length - updatedFiltered.length;
         filteredRecords.value = updatedFiltered;
-
-        print('===================================================\n');
 
         clearSelection();
 
-        // ✅ NEW: Delete from database (book has been returned)
-        // After successful checkin, the book is no longer issued, so remove it completely
-        // CRITICAL FIX: Delete ONLY this student's checkout, not all checkouts of that book
         try {
           final offlineDb = Get.find<OfflineDatabaseService>();
           final db = await offlineDb.database;
 
-          print('\n🗑️ ========== DELETING FROM DATABASE ==========');
-          print('   Attempting to delete from checked_out_books table');
-          print('   Book Code: $bookCodeToRemove');
-          print('   Student Name: $studentNameToRemove');
-          print('   Student ID: $studentIdToRemove');
-          print('   Teacher ID: ${user.code}');
-
-          // Strategy 1: Delete by bookCode + studentName + teacherId (most specific)
           final deleteCount = await db.delete(
             'checked_out_books',
             where: 'bookCode = ? AND studentName = ? AND teacherId = ?',
             whereArgs: [bookCodeToRemove, studentNameToRemove, user.code],
           );
 
-          if (deleteCount > 0) {
-            print('   ✅ Strategy 1 SUCCESS: Deleted $deleteCount record(s)');
-          } else {
-            print('   ⚠️ Strategy 1: No records deleted, trying Strategy 2...');
-
-            // Strategy 2: Try by studentId if name didn't match
+          if (deleteCount == 0) {
             final deleteCount2 = await db.delete(
               'checked_out_books',
               where: 'bookCode = ? AND studentId = ? AND teacherId = ?',
               whereArgs: [bookCodeToRemove, studentIdToRemove, user.code],
             );
 
-            if (deleteCount2 > 0) {
-              print('   ✅ Strategy 2 SUCCESS: Deleted $deleteCount2 record(s)');
-            } else {
-              print(
-                '   ⚠️ Strategy 2: No records deleted, trying Strategy 3...',
-              );
-
-              // Strategy 3: Try by F4_LCODE field
-              final deleteCount3 = await db.delete(
+            if (deleteCount2 == 0) {
+              await db.delete(
                 'checked_out_books',
                 where: 'F4_LCODE = ? AND studentName = ? AND teacherId = ?',
                 whereArgs: [bookCodeToRemove, studentNameToRemove, user.code],
               );
-
-              if (deleteCount3 > 0) {
-                print(
-                  '   ✅ Strategy 3 SUCCESS: Deleted $deleteCount3 record(s)',
-                );
-              } else {
-                print('   ⚠️ Strategy 3: No records deleted');
-
-                // Debug: Show what's actually in the database
-                print('   🔍 DEBUG: Checking what\'s in the database...');
-                final allBooks = await db.query('checked_out_books');
-                print('      Total records in table: ${allBooks.length}');
-                for (
-                  int i = 0;
-                  i < (allBooks.length > 5 ? 5 : allBooks.length);
-                  i++
-                ) {
-                  final book = allBooks[i];
-                  print(
-                    '      [$i] Code: ${book['bookCode']}, Student: ${book['studentName']}, Teacher: ${book['teacherId']}',
-                  );
-                }
-              }
             }
           }
+        } catch (e) {}
 
-          print('===================================================\n');
-        } catch (e) {
-          print('❌ Error deleting from database: $e');
-        }
-
-        // ✅ Additional: Explicitly trigger observable update with refresh
-        print('🔄 Triggering UI refresh...');
         checkedOutBooks.refresh();
         filteredRecords.refresh();
-        print('✅ UI refresh triggered');
 
-        // ✅ NEW: Refresh home page book issue count
         try {
           final homeController = Get.find<HomeController>();
           await homeController.fetchBookIssueCounts();
-          print('✅ Home controller refreshed');
-        } catch (e) {
-          print('⚠️ Could not refresh home controller: $e');
-        }
+        } catch (e) {}
 
-        // ✅ DO NOT refresh from database immediately as it may re-add the book
-        // if the backend hasn't processed the checkin yet
-        // The book will be removed from the backend on next sync or refresh
-
-        // Show appropriate success message
         String onlineMessage;
         String offlineMessage;
 
@@ -1008,45 +795,28 @@ class CheckinController extends GetxController {
             offlineMessage =
                 'किताब ऑफलाइन वापस की गई! 📱\nऑनलाइन होने पर यह स्वचालित रूप से सिंक होगा।';
             break;
-
           case 'damaged':
-            onlineMessage =
-                'किताब को क्षतिग्रस्त (Damaged) के रूप में दर्ज किया गया!';
+            onlineMessage = 'किताब को क्षतिग्रस्त (Damaged) के रूप में दर्ज किया गया!';
             offlineMessage =
                 'किताब को ऑफलाइन क्षतिग्रस्त (Damaged) के रूप में दर्ज किया गया! 📱\nऑनलाइन होने पर यह स्वचालित रूप से सिंक होगा।';
             break;
-
-          default: // lost
+          default:
             onlineMessage = 'किताब को खोई हुई (Lost) के रूप में दर्ज किया गया!';
             offlineMessage =
                 'किताब को ऑफलाइन खोई हुई (Lost) के रूप में दर्ज किया गया! 📱\nऑनलाइन होने पर यह स्वचालित रूप से सिंक होगा।';
         }
 
-        final message = result['offline'] == true
-            ? offlineMessage
-            : onlineMessage;
-
-        print('\n✅ CHECKIN SUCCESS:');
-        print('   Offline: ${result['offline']}');
-        print('   Message: $message');
-        print('   Books remaining in list: ${checkedOutBooks.length}');
+        final message = result['offline'] == true ? offlineMessage : onlineMessage;
 
         Get.snackbar(
           result['offline'] == true ? '📱 ऑफलाइन सहेजा गया' : '✅ सफल',
           message,
-          backgroundColor: result['offline'] == true
-              ? Color.fromARGB(255, 255, 152, 0)
-              : Colors.green,
+          backgroundColor:
+              result['offline'] == true ? Color.fromARGB(255, 255, 152, 0) : Colors.green,
           colorText: Colors.white,
           duration: Duration(seconds: result['offline'] == true ? 4 : 3),
         );
       } else {
-        // Show error message
-        print('\n❌ CHECKIN FAILED:');
-        print('   Success: ${result['success']}');
-        print('   Message: ${result['message']}');
-        print('   Offline: ${result['offline']}');
-
         Get.snackbar(
           'त्रुटि',
           result['message'] ?? 'चेकइन असफल',
@@ -1063,7 +833,6 @@ class CheckinController extends GetxController {
       isLoading.value = false;
     }
   }
-
   // ================= MISSING METHODS =================
 
   void selectCondition(String condition) {
