@@ -396,8 +396,8 @@ class CheckinController extends GetxController {
       // ✅ CRITICAL FIX: F4_LCODE is the book code (M1_CODE), NOT a numeric ID
       // Extract it first from rawData, then from record fields
       var bookCode =
-          rawData?['F4_PARTY_NO']?.toString() ??
-          record['F4_PARTY_NO']?.toString() ??
+          rawData?['F4_LCODE']?.toString() ??
+          record['F4_LCODE']?.toString() ??
           record['bookCode']?.toString() ??
           '';
 
