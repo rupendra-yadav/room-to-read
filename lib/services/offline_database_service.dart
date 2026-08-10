@@ -1077,7 +1077,14 @@ class OfflineDatabaseService extends GetxService {
           'id': student['id'] ?? student['M1_NO'] ?? '',
           'code': student['code'] ?? student['M1_CODE'] ?? '',
           'name': student['name'] ?? student['M1_NAME'] ?? '',
-          'className': student['className'] ?? student['M1_GROUP2N'] ?? '',
+          // M1_OPP is the confirmed live field for a student's grade (see
+          // Student.fromJson); M1_GROUP2N is kept as a fallback for any raw
+          // map that only carries that key.
+          'className':
+              student['className'] ??
+              student['M1_OPP'] ??
+              student['M1_GROUP2N'] ??
+              '',
           'readingLevel':
               int.tryParse(student['readingLevel']?.toString() ?? '0') ?? 0,
           'currentLevel':

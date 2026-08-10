@@ -35,15 +35,15 @@ class Student {
     final currentLevel = int.tryParse(json['M1_TXT2']?.toString() ?? '') ?? 0;
     final prevLevel = int.tryParse(json['M1_TXT1']?.toString() ?? '') ?? 0;
 
-    // M1_GROUP2N is the student's class/grade — every other place in this
-    // codebase that populates a student's className uses this same field
-    // (hybrid_api_service.dart, offline_database_service.dart,
-    // offline_sync_service.dart). M1_OPP is unrelated — it's used elsewhere
-    // for a teacher/user attribute (see UserModel.opp), not a student's
-    // class, so reading it here left className empty/wrong for most
-    // students — breaking both the grade display and any grade-filtered
-    // search downstream.
-    final className = json['M1_GROUP2N']?.toString() ?? '';
+    // Confirmed via a live /Api/student response: M1_OPP holds the grade
+    // number and matches the `grade` request param exactly (e.g. querying
+    // grade=1 returns students with M1_OPP="1"). M1_GROUP2N is kept as a
+    // fallback since other offline-caching code paths in this app populate
+    // className from it, in case a given record only has one of the two.
+    final className =
+        json['M1_OPP']?.toString().isNotEmpty == true
+            ? json['M1_OPP'].toString()
+            : (json['M1_GROUP2N']?.toString() ?? '');
 
     // Get teacher ID from M1_GROUP2
     final teacherId = json['M1_GROUP2']?.toString() ?? '';
