@@ -545,6 +545,7 @@ class ApiService extends GetxService {
         'grade': className, // Class (optional)
         'M1_GROUP': finalSchoolId, // ✅ NEW: School ID as M1_GROUP
         'M1GROUP1': finalProgramId, // ✅ NEW: Program ID as M1GROUP1
+        'F4_PS': '1',
       });
 
       // ✅ DEBUG: Log the FormData being sent

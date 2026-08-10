@@ -476,6 +476,18 @@ for (final u in pendingLevels) {
         }
       }
 
+      // A book checked out AND checked in entirely offline (same session,
+      // before either synced) has no real server-assigned F4_LCODE to link
+      // the checkin to — saveOfflineCheckout() stores the book's own code
+      // as a placeholder there instead, since no transaction row exists
+      // yet. Now that the checkouts above have (hopefully) synced and been
+      // assigned real IDs, patch any pending checkin's stored F4_LCODE with
+      // the real value before it gets synced, so its F4_STAT link is
+      // correct.
+      if (checkoutTransactions.isNotEmpty && checkinTransactions.isNotEmpty) {
+        await _backfillCheckinLcodesFromServer(checkinTransactions);
+      }
+
       // ✅ NEW: Sync checkins in batches to handle API limits
       if (checkinTransactions.isNotEmpty) {
         syncStatus.value = 'चेकइन ट्रांजैक्शन बल्क सिंक हो रहे हैं...';
@@ -857,6 +869,92 @@ for (final u in pendingLevels) {
     } catch (e) {
       print('❌ Error in bulk checkout sync: $e');
       return {'success': false, 'message': 'Bulk checkout sync error: $e'};
+    }
+  }
+
+  /// Patches pending checkin transactions' stored F4_LCODE with the real,
+  /// server-assigned value for the matching checkout, now that offline
+  /// checkouts synced above have a genuine transaction row. Matches by
+  /// book_id + student_id (the same fields `checked_out_books` caching
+  /// already keys on) per teacher.
+  Future<void> _backfillCheckinLcodesFromServer(
+    List<Map<String, dynamic>> checkinTransactions,
+  ) async {
+    try {
+      final db = await _offlineDb.database;
+      final teacherIds = checkinTransactions
+          .map((t) => t['teacher_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      for (final teacherId in teacherIds) {
+        List<dynamic> serverBooks;
+        try {
+          serverBooks = await _apiService.getCheckedOutBooks(
+            teacherId: teacherId,
+          );
+        } catch (e) {
+          print(
+            '⚠️ Could not fetch checked-out books to backfill F4_LCODE for teacher $teacherId: $e',
+          );
+          continue;
+        }
+
+        for (final t in checkinTransactions) {
+          if (t['teacher_id']?.toString() != teacherId) continue;
+          final rawDataStr = t['raw_data'] as String?;
+          if (rawDataStr == null) continue;
+
+          Map<String, dynamic> data;
+          try {
+            data = jsonDecode(rawDataStr) as Map<String, dynamic>;
+          } catch (_) {
+            continue;
+          }
+
+          final bookId = data['book_id']?.toString() ?? '';
+          final studentId = data['student_id']?.toString() ?? '';
+          if (bookId.isEmpty || studentId.isEmpty) continue;
+
+          final match = serverBooks
+              .cast<Map>()
+              .where(
+                (b) =>
+                    (b['bookId']?.toString() ?? '') == bookId &&
+                    (b['studentId']?.toString() ?? '') == studentId,
+              )
+              .firstOrNull;
+
+          final realLcode = match?['F4_LCODE']?.toString();
+          if (match == null || realLcode == null || realLcode.isEmpty) {
+            continue;
+          }
+          if (data['F4_LCODE']?.toString() == realLcode) {
+            continue; // already correct
+          }
+
+          data['F4_LCODE'] = realLcode;
+          final updatedRawData = jsonEncode(data);
+          await db.update(
+            'offline_transactions_enhanced',
+            {'raw_data': updatedRawData},
+            where: 'transaction_id = ?',
+            whereArgs: [t['transaction_id']],
+          );
+          // Also patch the in-memory transaction, since this same sync pass
+          // reads `checkinTransactions` (built before this backfill ran) to
+          // push checkins right after this — without this, the DB update
+          // above would only take effect on a *future* sync attempt, after
+          // this pass had already sent the stale F4_LCODE and marked the
+          // checkin as synced.
+          t['raw_data'] = updatedRawData;
+          print(
+            '✅ Backfilled real F4_LCODE=$realLcode for pending checkin ${t['transaction_id']}',
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Error backfilling checkin F4_LCODE values: $e');
     }
   }
 
