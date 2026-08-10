@@ -315,73 +315,31 @@ class AnalysisPage extends GetView<AnalysisController> {
                     Row(
                       children: [
                         Expanded(
-                          child: Container(
-                            padding: EdgeInsets.all(isMobile ? 12 : 14),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue[200]!),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'कुल रिकॉर्ड',
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 12 : 13,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                SizedBox(height: isMobile ? 6 : 8),
-                                Obx(
-                                  () => Text(
-                                    '${controller.totalRecords.value}',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 18 : 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue[700],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          child: _buildStatCard(
+                            'पाठकों की कुल संख्या',
+                            controller.totalReaders,
+                            Colors.blue,
+                            isMobile,
                           ),
                         ),
                         SizedBox(width: isMobile ? 10 : 12),
                         Expanded(
-                          child: Container(
-                            padding: EdgeInsets.all(isMobile ? 12 : 14),
-                            decoration: BoxDecoration(
-                              color: Colors.green[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.green[200]!),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'औसत प्रति माह',
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 12 : 13,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                SizedBox(height: isMobile ? 6 : 8),
-                                Obx(
-                                  () => Text(
-                                    '${controller.avgPerMonth.value}',
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 18 : 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green[700],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          child: _buildStatCard(
+                            'कुल रिकॉर्ड',
+                            controller.totalCico,
+                            Colors.green,
+                            isMobile,
                           ),
                         ),
                       ],
+                    ),
+                    SizedBox(height: isMobile ? 10 : 12),
+                    _buildStatCard(
+                      'खोई हुई पुस्तकें',
+                      controller.totalLostBooks,
+                      Colors.red,
+                      isMobile,
+                      fullWidth: true,
                     ),
                     SizedBox(height: isMobile ? 16 : 20),
 
@@ -485,6 +443,44 @@ class AnalysisPage extends GetView<AnalysisController> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    String label,
+    RxInt value,
+    MaterialColor color,
+    bool isMobile, {
+    bool fullWidth = false,
+  }) {
+    return Container(
+      width: fullWidth ? double.infinity : null,
+      padding: EdgeInsets.all(isMobile ? 12 : 14),
+      decoration: BoxDecoration(
+        color: color[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: isMobile ? 12 : 13, color: Colors.grey[600]),
+          ),
+          SizedBox(height: isMobile ? 6 : 8),
+          Obx(
+            () => Text(
+              '${value.value}',
+              style: TextStyle(
+                fontSize: isMobile ? 18 : 20,
+                fontWeight: FontWeight.bold,
+                color: color[700],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

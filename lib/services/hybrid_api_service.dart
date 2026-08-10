@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:get/get.dart';
 import 'package:room_to_read/models/book_model.dart';
 import 'package:room_to_read/models/grade_model.dart';
@@ -34,15 +36,29 @@ class HybridApiService extends GetxService {
           final localRows = await db.query('students');
           final localMap = {for (var r in localRows) r['code']: r};
 
+          // A student with a pending (not-yet-synced) local reading level
+          // change hasn't reached the admin portal yet, so the server value
+          // for them is stale — keep the local value until it syncs. For
+          // everyone else, the admin portal is the source of truth.
+          final pendingUpdates = await _offlineDb
+              .getPendingReadingLevelUpdates();
+          final pendingCodes = pendingUpdates
+              .map((u) => u['student_code'] as String?)
+              .whereType<String>()
+              .toSet();
+
           final mergedForSave = <Map<String, dynamic>>[];
           final mergedStudents = <Student>[];
 
           for (final s in students) {
             final local = localMap[s.code];
-            final mergedReadingLevel =
-                local?['readingLevel'] as int? ?? s.readingLevel;
-            final mergedPreviousLevel =
-                local?['previousLevel'] as int? ?? s.previousLevel;
+            final hasPendingUpdate = pendingCodes.contains(s.code);
+            final mergedReadingLevel = hasPendingUpdate
+                ? (local?['readingLevel'] as int? ?? s.readingLevel)
+                : s.readingLevel;
+            final mergedPreviousLevel = hasPendingUpdate
+                ? (local?['previousLevel'] as int? ?? s.previousLevel)
+                : s.previousLevel;
 
             mergedForSave.add({
               'M1_NO': s.id,
@@ -59,7 +75,6 @@ class HybridApiService extends GetxService {
             mergedStudents.add(
               s.copyWith(
                 readingLevel: mergedReadingLevel,
-                currentLevel: mergedReadingLevel,
                 previousLevel: mergedPreviousLevel,
               ),
             );
@@ -85,7 +100,6 @@ class HybridApiService extends GetxService {
             teacherId: e['teacherId'] ?? '',
             readingLevel: e['readingLevel'] ?? 0,
             previousLevel: e['previousLevel'] ?? 0,
-            currentLevel: e['currentLevel'] ?? 0,
           ),
         )
         .toList();
@@ -448,6 +462,37 @@ class HybridApiService extends GetxService {
         );
 
         if (result['success'] == true) {
+          // ApiService.checkin() runs its own connectivity check and can
+          // take its offline branch (e.g. connectivity dropped between this
+          // check and that one), queuing the transaction locally instead of
+          // reaching the server. Trust what actually happened instead of
+          // assuming this is a synced online success — otherwise the UI
+          // reports (and this layer finalizes) a checkin that never made it
+          // to the backend, and it silently sits unsynced until the user
+          // manually triggers a sync.
+          if (result['offline'] == true) {
+            print(
+              '📱 API checkin actually saved offline (connectivity changed mid-call)',
+            );
+            try {
+              await _updateBookAvailabilityForCheckin(bookCode);
+              if (studentId != null) {
+                await _updateStudentBooksIssuedForCheckin(studentId);
+              }
+            } catch (e) {
+              print('⚠️ Warning: Could not update book availability: $e');
+            }
+
+            return {
+              'success': true,
+              'offline': true,
+              'synced': false,
+              'removedFromList': true,
+              'message':
+                  result['message'] ?? 'Book returned offline! Will sync when online.',
+            };
+          }
+
           print('✅ Online checkin successful');
 
           await _updateLocalDataForCheckin(
@@ -651,6 +696,7 @@ class HybridApiService extends GetxService {
                 filteredOnline
                     .map((e) => Map<String, dynamic>.from(e))
                     .toList(),
+                teacherId: teacherId,
               );
               print('✅ Local cache updated with filtered API data');
             } else {
@@ -1022,16 +1068,30 @@ class HybridApiService extends GetxService {
     final pending = await _offlineDb.getPendingOfflineTransactions();
     final pendingForTeacher = pending
         .where((t) => t['teacher_id'] == teacherId)
-        .map(
-          (t) => {
+        .map((t) {
+          // A pending checkin's real condition (good=2/damaged=3/lost=4) is
+          // only in its raw_data JSON — transaction_type alone can't tell
+          // good from damaged from lost, so hardcoding '2' here made every
+          // not-yet-synced damaged/lost checkin show up as a normal good
+          // return until it synced.
+          String bt = t['transaction_type'] == 'checkout' ? '1' : '2';
+          if (t['transaction_type'] != 'checkout') {
+            try {
+              final raw =
+                  jsonDecode(t['raw_data'] as String? ?? '{}')
+                      as Map<String, dynamic>;
+              bt = (raw['F4_BT'] ?? '2').toString();
+            } catch (_) {}
+          }
+          return {
             'F4_PARTY1N': t['student_name'],
             'F4_PARTYN': t['book_name'],
             'F4_LCODE': t['book_code'],
             'F4_TXT2': t['class_name'],
-            'F4_BT': t['transaction_type'] == 'checkout' ? '1' : '2',
+            'F4_BT': bt,
             'F4_USERDT': t['transaction_date'],
-          },
-        )
+          };
+        })
         .toList();
 
     return [...cached, ...pendingForTeacher];
@@ -1201,11 +1261,13 @@ class HybridApiService extends GetxService {
       // Download students
       print('👥 Downloading students...');
       try {
-        final students = await _apiService.getStudents(group1: teacherId);
+        // Use getStudents() rather than the raw API call so the M1_TXT2/
+        // M1_TXT1 fields get mapped to readingLevel/previousLevel (and
+        // merged with any pending local edits) before being cached —
+        // caching the raw API rows directly used to silently zero out
+        // every student's reading level on each full offline download.
+        final students = await getStudents(group1: teacherId);
         if (students.isNotEmpty) {
-          await _offlineDb.saveStudentsOffline(
-            students.cast<Map<String, dynamic>>(),
-          );
           print('✅ Cached ${students.length} students');
         }
       } catch (e) {

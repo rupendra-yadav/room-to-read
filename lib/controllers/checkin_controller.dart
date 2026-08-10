@@ -221,7 +221,16 @@ class CheckinController extends GetxController {
       if (enrichedData.isEmpty) {
       } else {}
 
-      checkedOutBooks.value = enrichedData
+      // ✅ Exclude books whose checkin has already been synced to the server
+      // (offline_transactions_enhanced sync_status=1) — without this, a book
+      // that was already returned keeps reappearing here because the API/
+      // cache can still list it as checked out for a while after.
+      final filteredData = await _filterOutLocalCheckins(
+        enrichedData,
+        user.code,
+      );
+
+      checkedOutBooks.value = filteredData
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
 
@@ -862,9 +871,49 @@ Future<Map<String, dynamic>> completeCheckin(String condition) async {
       }).toList();
     }
 
-    // Date filter — unchanged
-    if (dateFromFilter.value.isNotEmpty || dateToFilter.value.isNotEmpty) {
-      // ... your existing date filter code
+    // Date filter — this used to be a no-op (dead code), so applying a date
+    // range silently produced whatever fetchCheckedOutBooks() happened to
+    // return, with no client-side narrowing at all.
+    if (dateFromFilter.value.isNotEmpty) {
+      final fromParsed = DateTime.tryParse(dateFromFilter.value);
+      if (fromParsed != null) {
+        final fromDay = DateTime(
+          fromParsed.year,
+          fromParsed.month,
+          fromParsed.day,
+        );
+        filtered = filtered.where((book) {
+          final rawDate =
+              book['F4_DATE1']?.toString() ??
+              book['checkoutDate']?.toString() ??
+              book['F4_DATE']?.toString() ??
+              '';
+          if (rawDate.isEmpty) return true;
+          final bookDate = DateTime.tryParse(rawDate.trim().replaceFirst(' ', 'T'));
+          if (bookDate == null) return true;
+          final bookDay = DateTime(bookDate.year, bookDate.month, bookDate.day);
+          return !bookDay.isBefore(fromDay);
+        }).toList();
+      }
+    }
+
+    if (dateToFilter.value.isNotEmpty) {
+      final toParsed = DateTime.tryParse(dateToFilter.value);
+      if (toParsed != null) {
+        final toDay = DateTime(toParsed.year, toParsed.month, toParsed.day);
+        filtered = filtered.where((book) {
+          final rawDate =
+              book['F4_DATE1']?.toString() ??
+              book['checkoutDate']?.toString() ??
+              book['F4_DATE']?.toString() ??
+              '';
+          if (rawDate.isEmpty) return true;
+          final bookDate = DateTime.tryParse(rawDate.trim().replaceFirst(' ', 'T'));
+          if (bookDate == null) return true;
+          final bookDay = DateTime(bookDate.year, bookDate.month, bookDate.day);
+          return !bookDay.isAfter(toDay);
+        }).toList();
+      }
     }
 
     // Search filter — unchanged

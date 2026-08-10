@@ -83,7 +83,6 @@ class StudentController extends GetxController {
               name: data['name'] ?? '',
               className: data['className'] ?? '',
               readingLevel: data['readingLevel'] ?? 0,
-              currentLevel: data['currentLevel'] ?? 0,
               booksIssued: data['booksIssued'] ?? 0,
               lastUpdated:
                   DateTime.tryParse(data['lastUpdated'] ?? '') ??
@@ -125,7 +124,6 @@ class StudentController extends GetxController {
               name: data['name'] ?? '',
               className: data['className'] ?? '',
               readingLevel: data['readingLevel'] ?? 0,
-              currentLevel: data['currentLevel'] ?? 0,
               booksIssued: data['booksIssued'] ?? 0,
               lastUpdated:
                   DateTime.tryParse(data['lastUpdated'] ?? '') ??
@@ -268,19 +266,17 @@ class StudentController extends GetxController {
       }
 
       print('📡 Downloading fresh student data from API...');
-      final apiService = Get.find<ApiService>();
-      final freshStudents = await apiService.getStudents(group1: teacherId);
+      // Go through HybridApiService.getStudents() rather than the raw API
+      // call so the M1_TXT2/M1_TXT1 fields get mapped to readingLevel/
+      // previousLevel (and merged with any pending local edits) before
+      // being cached — saving the raw API rows directly used to silently
+      // zero out every student's reading level.
+      final hybridApiService = Get.find<HybridApiService>();
+      final freshStudents = await hybridApiService.getStudents(
+        group1: teacherId,
+      );
 
       if (freshStudents.isNotEmpty) {
-        print(
-          '💾 Saving ${freshStudents.length} students to offline storage...',
-        );
-
-        // Convert to proper format for offline storage (use the API response format directly)
-        final offlineDb = Get.find<OfflineDatabaseService>();
-        await offlineDb.saveStudentsOffline(
-          freshStudents.cast<Map<String, dynamic>>(),
-        );
         print(
           '✅ Successfully saved ${freshStudents.length} students to offline storage',
         );
@@ -371,7 +367,6 @@ class StudentController extends GetxController {
       students[i] = students[i].copyWith(
         readingLevel: newLevel,
         previousLevel: oldLevel,
-        currentLevel: newLevel,
       );
       applyFilters();
     }

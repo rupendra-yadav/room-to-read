@@ -17,9 +17,16 @@ class AnalysisController extends GetxController {
   // Analytics data
   var chartLabels = <String>[].obs;
   var chartValues = <int>[].obs;
-  var totalRecords = 0.obs;
-  var avgPerMonth = 0.obs;
   var reportList = <Map<String, dynamic>>[].obs;
+
+  // पाठकों की कुल संख्या — distinct readers in the selected filters, each
+  // counted once no matter how many books they issued/returned.
+  var totalReaders = 0.obs;
+  // कुल रिकॉर्ड (Total CICO) — completed returns only (good or damaged);
+  // excludes books still checked out and books marked lost.
+  var totalCico = 0.obs;
+  // खोई हुई पुस्तकें — books marked lost, within the selected filters.
+  var totalLostBooks = 0.obs;
 
   var isOfflineData = false.obs;
 
@@ -153,14 +160,15 @@ class AnalysisController extends GetxController {
     print('🐛 isLoading: ${isLoading.value}');
     print('🐛 chartLabels: ${chartLabels.length} - $chartLabels');
     print('🐛 chartValues: ${chartValues.length} - $chartValues');
-    print('🐛 totalRecords: ${totalRecords.value}');
-    print('🐛 avgPerMonth: ${avgPerMonth.value}');
+    print('🐛 totalReaders: ${totalReaders.value}');
+    print('🐛 totalCico: ${totalCico.value}');
+    print('🐛 totalLostBooks: ${totalLostBooks.value}');
     print('🐛 reportList: ${reportList.length}');
     print('🐛 ===== END DEBUG STATE =====');
 
     Get.snackbar(
       'Analytics Debug',
-      'Records: ${totalRecords.value}, Chart: ${chartValues.length} points, Loading: ${isLoading.value}',
+      'Readers: ${totalReaders.value}, CICO: ${totalCico.value}, Lost: ${totalLostBooks.value}, Loading: ${isLoading.value}',
       backgroundColor: Colors.blue,
       colorText: Colors.white,
       duration: Duration(seconds: 3),
@@ -266,24 +274,25 @@ class AnalysisController extends GetxController {
 
           chartLabels.value = [];
           chartValues.value = [];
-          totalRecords.value = 0;
-          avgPerMonth.value = 0;
         }
 
-        // Summary
-        final summary = result['summary'] as Map<String, dynamic>? ?? {};
-
-        totalRecords.value =
-            summary['totalTransactions'] ??
-            summary['total_records'] ??
-            chartValues.fold(0, (a, b) => a + b);
-
-        avgPerMonth.value =
-            summary['avg_per_month'] ??
-            (chartValues.isNotEmpty
-                ? (chartValues.fold(0, (a, b) => a + b) / chartValues.length)
-                      .round()
-                : 0);
+        // पाठकों की कुल संख्या / कुल रिकॉर्ड / खोई हुई पुस्तकें are all
+        // derived from the same CICO report rows (which carry a real
+        // per-student ID and the F4_BT condition code), computed once here
+        // rather than trusted from the analytics endpoint's own summary —
+        // that summary counts every row (i.e. books, not readers) and
+        // doesn't distinguish completed/lost/still-issued.
+        final cicoStats = await _computeCicoStats(
+          teacherId: currentUser.code,
+          className: className,
+          fromDate: dateFromFilter.value.isNotEmpty
+              ? dateFromFilter.value
+              : null,
+          toDate: dateToFilter.value.isNotEmpty ? dateToFilter.value : null,
+        );
+        totalReaders.value = cicoStats.readers;
+        totalCico.value = cicoStats.completedReturns;
+        totalLostBooks.value = cicoStats.lostBooks;
 
         // Report list
         reportList.value = List<Map<String, dynamic>>.from(
@@ -292,24 +301,27 @@ class AnalysisController extends GetxController {
 
         print('✅ Analytics loaded successfully:');
         print('   Offline: ${isOfflineData.value}');
-        print('   Total Records: ${totalRecords.value}');
-        print('   Avg Per Month: ${avgPerMonth.value}');
+        print('   Total Readers: ${totalReaders.value}');
+        print('   Total CICO: ${totalCico.value}');
+        print('   Total Lost: ${totalLostBooks.value}');
         print('   Chart Labels: ${chartLabels.length} - $chartLabels');
         print('   Chart Values: ${chartValues.length} - $chartValues');
         print('   Report List: ${reportList.length}');
 
         chartLabels.refresh();
         chartValues.refresh();
-        totalRecords.refresh();
-        avgPerMonth.refresh();
+        totalReaders.refresh();
+        totalCico.refresh();
+        totalLostBooks.refresh();
         reportList.refresh();
       } else {
         print('❌ Analytics API failed: ${result['message']}');
 
         chartLabels.value = [];
         chartValues.value = [];
-        totalRecords.value = 0;
-        avgPerMonth.value = 0;
+        totalReaders.value = 0;
+        totalCico.value = 0;
+        totalLostBooks.value = 0;
         reportList.value = [];
 
         Get.snackbar(
@@ -325,13 +337,72 @@ class AnalysisController extends GetxController {
 
       chartLabels.value = [];
       chartValues.value = [];
-      totalRecords.value = 0;
-      avgPerMonth.value = 0;
+      totalReaders.value = 0;
+      totalCico.value = 0;
+      totalLostBooks.value = 0;
       reportList.value = [];
 
       Get.snackbar('Error', 'Failed to load analytics: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Computes all three CICO stats from one fetch of CICO report rows:
+  /// - readers: distinct student IDs (falling back to name if no ID field
+  ///   is present), each counted once regardless of how many books they
+  ///   issued/returned.
+  /// - completedReturns: rows where the book came back (F4_BT 2=good or
+  ///   3=damaged) — excludes still-checked-out (1) and lost (4) rows.
+  /// - lostBooks: rows where F4_BT=4 (marked lost).
+  Future<({int readers, int completedReturns, int lostBooks})>
+  _computeCicoStats({
+    required String teacherId,
+    String? className,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    try {
+      final records = await apiService.getCicoReport(
+        teacherId: teacherId,
+        className: className,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
+
+      final readerIds = <String>{};
+      var completedReturns = 0;
+      var lostBooks = 0;
+
+      for (final r in records) {
+        final record = r as Map;
+        final id = (record['studentId'] ??
+                record['F4_PARTY1'] ??
+                record['student_id'] ??
+                record['studentName'] ??
+                record['F4_PARTY1N'] ??
+                record['student_name'] ??
+                '')
+            .toString()
+            .trim();
+        if (id.isNotEmpty) readerIds.add(id);
+
+        final bt = (record['F4_BT'] ?? '').toString().trim();
+        if (bt == '2' || bt == '3') {
+          completedReturns++;
+        } else if (bt == '4') {
+          lostBooks++;
+        }
+      }
+
+      return (
+        readers: readerIds.length,
+        completedReturns: completedReturns,
+        lostBooks: lostBooks,
+      );
+    } catch (e) {
+      print('❌ Error computing CICO stats: $e');
+      return (readers: 0, completedReturns: 0, lostBooks: 0);
     }
   }
 }

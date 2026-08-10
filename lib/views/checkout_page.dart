@@ -243,7 +243,34 @@ class CheckoutPage extends GetView<CheckoutController> {
                                 Icons.menu_book,
                                 color: Colors.green[700],
                               ),
-                              title: Text(book.title),
+                              title: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    book.bookName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (book.bookRomanName.isNotEmpty)
+                                    Text(
+                                      book.bookRomanName,
+                                      style: const TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  if (book.bookLocalName.isNotEmpty &&
+                                      book.bookLocalName != book.bookName)
+                                    Text(
+                                      book.bookLocalName,
+                                      style: const TextStyle(fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
                               subtitle: Text(
                                 '${book.author} • कोड: ${book.bookCode} • उपलब्ध: ${book.availableCopies}',
                               ),
@@ -624,7 +651,7 @@ class CheckoutPage extends GetView<CheckoutController> {
                                                     CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    book.title,
+                                                    book.bookName,
                                                     style: TextStyle(
                                                       color: Colors.black,
                                                       fontSize: isMobile
@@ -633,7 +660,44 @@ class CheckoutPage extends GetView<CheckoutController> {
                                                       fontWeight:
                                                           FontWeight.bold,
                                                     ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
+                                                  if (book.bookRomanName
+                                                      .isNotEmpty)
+                                                    Text(
+                                                      book.bookRomanName,
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors.grey[700],
+                                                        fontSize: isMobile
+                                                            ? 12
+                                                            : 13,
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow
+                                                          .ellipsis,
+                                                    ),
+                                                  if (book.bookLocalName
+                                                          .isNotEmpty &&
+                                                      book.bookLocalName !=
+                                                          book.bookName)
+                                                    Text(
+                                                      book.bookLocalName,
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors.grey[500],
+                                                        fontSize: isMobile
+                                                            ? 11
+                                                            : 12,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow
+                                                          .ellipsis,
+                                                    ),
                                                   Text(
                                                     book.author,
                                                     style: TextStyle(

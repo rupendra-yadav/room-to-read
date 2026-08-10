@@ -577,6 +577,13 @@ for (final u in pendingLevels) {
         }
       }
 
+      // Screens (e.g. the check-in page) listen to lastSyncCompletedAt to
+      // know when to refresh — without this, the "बल्क सिंक" button never
+      // triggered that refresh, unlike the full offline-sync flow.
+      if (totalSuccessCount > 0) {
+        lastSyncCompletedAt.value = DateTime.now();
+      }
+
       return {
         'success': totalSuccessCount > 0,
         'successCount': totalSuccessCount,
@@ -601,7 +608,11 @@ for (final u in pendingLevels) {
   ) async {
     try {
       final transactionId = transaction['transaction_id'];
-      final bookCode = transaction['F4_LCODE'] ?? '';
+      // `transaction` is a raw offline_transactions_enhanced row, whose
+      // column is `book_code` — F4_LCODE only exists inside that table's
+      // JSON raw_data column, so reading it directly here always yielded ''
+      // and silently no-opped every delete below.
+      final bookCode = transaction['book_code'] ?? '';
       final studentId = transaction['student_id'] ?? '';
       final teacherId = transaction['teacher_id'] ?? '';
       final db = await _offlineDb.database;
@@ -1072,6 +1083,7 @@ for (final u in pendingLevels) {
       if (checkedOutBooks.isNotEmpty) {
         await _offlineDb.saveCheckedOutBooksOffline(
           checkedOutBooks.cast<Map<String, dynamic>>(),
+          teacherId: userId,
         );
         totalItems += checkedOutBooks.length;
       }

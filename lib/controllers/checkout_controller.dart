@@ -129,7 +129,6 @@ class CheckoutController extends GetxController {
               name: data['name'] ?? '',
               className: data['className'] ?? '',
               readingLevel: data['readingLevel'] ?? 0,
-              currentLevel: data['currentLevel'] ?? 0,
               booksIssued: data['booksIssued'] ?? 0,
               lastUpdated:
                   DateTime.tryParse(data['lastUpdated'] ?? '') ??

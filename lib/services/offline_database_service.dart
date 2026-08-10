@@ -1244,8 +1244,9 @@ class OfflineDatabaseService extends GetxService {
   }
 
   Future<void> saveCheckedOutBooksOffline(
-    List<Map<String, dynamic>> books,
-  ) async {
+    List<Map<String, dynamic>> books, {
+    String? teacherId,
+  }) async {
     try {
       final db = await database;
 
@@ -1299,7 +1300,14 @@ class OfflineDatabaseService extends GetxService {
           'id':
               book['F4_LCODE'] ??
               '${book['F4_PARTY_NO']}_${book['F4_PARTY1N']}',
-          'teacherId': book['F4_USERADD'] ?? book['teacherId'] ?? '',
+          // The teacher/school-scoped request that produced `books` is the
+          // reliable source of truth for teacherId — F4_USERADD is actually
+          // the *request* param name for creating a checkout, not a
+          // confirmed field on this list response, so trusting it here
+          // could cache an empty teacherId and make the row invisible to
+          // every teacher-scoped query downstream.
+          'teacherId':
+              teacherId ?? book['F4_USERADD'] ?? book['teacherId'] ?? '',
           'studentId': book['studentId'] ?? '',
           'studentName': book['F4_PARTY1N'] ?? book['studentName'] ?? '',
           'bookId': book['bookId'] ?? '',
@@ -1452,8 +1460,13 @@ class OfflineDatabaseService extends GetxService {
       }
 
       if (className != null && className.isNotEmpty) {
-        whereClause += ' AND className = ?';
-        whereArgs.add(className);
+        // Lenient LIKE match instead of exact equality — matches the
+        // .contains()-based class matching enhanced_offline_service.dart
+        // uses, since an exact match here could zero out results over
+        // whitespace/formatting differences the other (primary) offline
+        // path tolerates.
+        whereClause += ' AND className LIKE ?';
+        whereArgs.add('%$className%');
       }
 
       if (search != null && search.isNotEmpty) {
@@ -1461,11 +1474,63 @@ class OfflineDatabaseService extends GetxService {
         whereArgs.addAll(['%$search%', '%$search%']);
       }
 
-      final books = await db.query(
+      var books = await db.query(
         'checked_out_books',
         where: whereClause,
         whereArgs: whereArgs,
       );
+
+      // fromDate/toDate used to be accepted but silently ignored here, so
+      // this offline fallback path showed every currently-issued book
+      // regardless of the date range picked on the check-in page. Filtered
+      // the same way as the online/enhanced-offline paths, in Dart rather
+      // than SQL, since the stored date string's exact format isn't
+      // guaranteed to sort correctly as text.
+      if (fromDate != null && fromDate.isNotEmpty) {
+        final fromParsed = DateTime.tryParse(fromDate);
+        if (fromParsed != null) {
+          final fromDay = DateTime(
+            fromParsed.year,
+            fromParsed.month,
+            fromParsed.day,
+          );
+          books = books.where((book) {
+            final rawDate = (book['checkoutDate'] ?? '').toString();
+            if (rawDate.isEmpty) return true;
+            final bookDate = DateTime.tryParse(
+              rawDate.trim().replaceFirst(' ', 'T'),
+            );
+            if (bookDate == null) return true;
+            final bookDay = DateTime(
+              bookDate.year,
+              bookDate.month,
+              bookDate.day,
+            );
+            return !bookDay.isBefore(fromDay);
+          }).toList();
+        }
+      }
+
+      if (toDate != null && toDate.isNotEmpty) {
+        final toParsed = DateTime.tryParse(toDate);
+        if (toParsed != null) {
+          final toDay = DateTime(toParsed.year, toParsed.month, toParsed.day);
+          books = books.where((book) {
+            final rawDate = (book['checkoutDate'] ?? '').toString();
+            if (rawDate.isEmpty) return true;
+            final bookDate = DateTime.tryParse(
+              rawDate.trim().replaceFirst(' ', 'T'),
+            );
+            if (bookDate == null) return true;
+            final bookDay = DateTime(
+              bookDate.year,
+              bookDate.month,
+              bookDate.day,
+            );
+            return !bookDay.isAfter(toDay);
+          }).toList();
+        }
+      }
 
       return books.map((book) {
         return {

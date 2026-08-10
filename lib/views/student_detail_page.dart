@@ -268,7 +268,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                         // Reflect the change on this detail page's own widget.student
                         widget.student.previousLevel = previousLevel;
                         widget.student.readingLevel = result;
-                        widget.student.currentLevel = result;
 
                         setState(() {});
 

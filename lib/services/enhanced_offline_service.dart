@@ -128,7 +128,6 @@ class EnhancedOfflineService extends GetxService {
                   DateTime.now(),
               previousLevel: data['previousLevel'] ?? 0,
               teacherId: data['teacherId'] ?? '',
-              currentLevel: data['currentLevel'] ?? 0,
             ),
           )
           .toList();
