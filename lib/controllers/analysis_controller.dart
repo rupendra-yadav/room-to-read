@@ -223,11 +223,41 @@ class AnalysisController extends GetxController {
       print('   Aggregation: $apiAggregation');
       print('   Will send class to API: ${className != null ? "YES" : "NO"}');
 
+      final fromDate = dateFromFilter.value.isNotEmpty
+          ? dateFromFilter.value
+          : null;
+      final toDate = dateToFilter.value.isNotEmpty ? dateToFilter.value : null;
+
+      // पाठकों की कुल संख्या / कुल रिकॉर्ड / खोई हुई पुस्तकें are computed
+      // from CICO report rows independently of the chart/trend fetch below
+      // — they used to be nested inside `if (analytics succeeded)`, so any
+      // failure of that separate, chart-only endpoint (which has its own
+      // offline fallback and failure modes) silently zeroed out the reader
+      // count even when the CICO-report-based computation would have
+      // worked fine on its own.
+      final cicoStats = await _computeCicoStats(
+        teacherId: currentUser.code,
+        className: className,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
+      totalReaders.value = cicoStats.readers;
+      totalCico.value = cicoStats.completedReturns;
+      totalLostBooks.value = cicoStats.lostBooks;
+      totalReaders.refresh();
+      totalCico.refresh();
+      totalLostBooks.refresh();
+
+      print('📊 CICO stats computed independently of analytics chart:');
+      print('   Total Readers: ${totalReaders.value}');
+      print('   Total CICO: ${totalCico.value}');
+      print('   Total Lost: ${totalLostBooks.value}');
+
       final result = await apiService.getAnalytics(
         teacherId: currentUser.code,
         className: className,
-        dateFrom: dateFromFilter.value.isNotEmpty ? dateFromFilter.value : null,
-        dateTo: dateToFilter.value.isNotEmpty ? dateToFilter.value : null,
+        dateFrom: fromDate,
+        dateTo: toDate,
         aggregation: apiAggregation,
       );
 
@@ -276,52 +306,25 @@ class AnalysisController extends GetxController {
           chartValues.value = [];
         }
 
-        // पाठकों की कुल संख्या / कुल रिकॉर्ड / खोई हुई पुस्तकें are all
-        // derived from the same CICO report rows (which carry a real
-        // per-student ID and the F4_BT condition code), computed once here
-        // rather than trusted from the analytics endpoint's own summary —
-        // that summary counts every row (i.e. books, not readers) and
-        // doesn't distinguish completed/lost/still-issued.
-        final cicoStats = await _computeCicoStats(
-          teacherId: currentUser.code,
-          className: className,
-          fromDate: dateFromFilter.value.isNotEmpty
-              ? dateFromFilter.value
-              : null,
-          toDate: dateToFilter.value.isNotEmpty ? dateToFilter.value : null,
-        );
-        totalReaders.value = cicoStats.readers;
-        totalCico.value = cicoStats.completedReturns;
-        totalLostBooks.value = cicoStats.lostBooks;
-
         // Report list
         reportList.value = List<Map<String, dynamic>>.from(
           result['list'] ?? [],
         );
 
-        print('✅ Analytics loaded successfully:');
+        print('✅ Analytics chart loaded successfully:');
         print('   Offline: ${isOfflineData.value}');
-        print('   Total Readers: ${totalReaders.value}');
-        print('   Total CICO: ${totalCico.value}');
-        print('   Total Lost: ${totalLostBooks.value}');
         print('   Chart Labels: ${chartLabels.length} - $chartLabels');
         print('   Chart Values: ${chartValues.length} - $chartValues');
         print('   Report List: ${reportList.length}');
 
         chartLabels.refresh();
         chartValues.refresh();
-        totalReaders.refresh();
-        totalCico.refresh();
-        totalLostBooks.refresh();
         reportList.refresh();
       } else {
-        print('❌ Analytics API failed: ${result['message']}');
+        print('❌ Analytics chart API failed: ${result['message']}');
 
         chartLabels.value = [];
         chartValues.value = [];
-        totalReaders.value = 0;
-        totalCico.value = 0;
-        totalLostBooks.value = 0;
         reportList.value = [];
 
         Get.snackbar(
@@ -337,9 +340,6 @@ class AnalysisController extends GetxController {
 
       chartLabels.value = [];
       chartValues.value = [];
-      totalReaders.value = 0;
-      totalCico.value = 0;
-      totalLostBooks.value = 0;
       reportList.value = [];
 
       Get.snackbar('Error', 'Failed to load analytics: $e');

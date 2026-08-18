@@ -888,13 +888,22 @@ class CheckinPage extends GetView<CheckinController> {
                                                       'जारी: $dueDate';
                                                 }
                                               } catch (e) {
-                                                formattedDueDate =
-                                                    'देय तिथि: $dueDate';
+                                                // formattedDueDate =
+                                                //     'देय तिथि: $dueDate';
+                                                formattedDueDate = '';
                                               }
                                             } else {
-                                              formattedDueDate =
-                                                  'देय तिथि: अज्ञात';
+                                              // formattedDueDate =
+                                              //     'देय तिथि: अज्ञात';
+                                              formattedDueDate = '';
                                             }
+
+                                            final checkoutDate = getFieldValue(
+                                              record,
+                                              rawData,
+                                              ['checkoutDate', 'F4_DATE1'],
+                                              defaultValue: 'N/A',
+                                            );
 
                                             return Padding(
                                               padding: EdgeInsets.only(
@@ -910,6 +919,7 @@ class CheckinPage extends GetView<CheckinController> {
                                                     ? Colors.red[50]!
                                                     : Colors.blue[50]!,
                                                 isMobile,
+                                                checkoutDate,
                                                 () {
                                                   controller.selectRecordByData(
                                                     record,
@@ -986,6 +996,12 @@ class CheckinPage extends GetView<CheckinController> {
         rawData?['F4_DT2'] ??
         rawData?['due_date'] ??
         record['dueDate'] ??
+        'N/A';
+    final checkoutDate =
+        record['checkoutDate'] ??
+        record['F4_DATE1'] ??
+        rawData?['F4_DATE1'] ??
+        rawData?['checkoutDate'] ??
         'N/A';
 
     return SingleChildScrollView(
@@ -1179,6 +1195,13 @@ class CheckinPage extends GetView<CheckinController> {
                             ),
                             Text(
                               'ID: $bookCode',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: isMobile ? 11 : 12,
+                              ),
+                            ),
+                            Text(
+                              'चेक-आउट तिथि: $checkoutDate',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: isMobile ? 11 : 12,
@@ -1390,6 +1413,7 @@ class CheckinPage extends GetView<CheckinController> {
     String overdueStatus,
     Color bgColor,
     bool isMobile,
+    String checkoutDate,
     VoidCallback onTap,
   ) {
     final bool isOverdue = overdueStatus.isNotEmpty;
@@ -1397,8 +1421,8 @@ class CheckinPage extends GetView<CheckinController> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(isMobile ? 16 : 18),
-        margin: EdgeInsets.only(bottom: isMobile ? 8 : 10),
+        padding: EdgeInsets.all(isMobile ? 12 : 14),
+        margin: EdgeInsets.only(bottom: isMobile ? 6 : 8),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
@@ -1429,7 +1453,7 @@ class CheckinPage extends GetView<CheckinController> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  SizedBox(height: 2),
 
                   // Class
                   Text(
@@ -1439,7 +1463,7 @@ class CheckinPage extends GetView<CheckinController> {
                       fontSize: isMobile ? 13 : 14,
                     ),
                   ),
-                  SizedBox(height: 12),
+                  SizedBox(height: 6),
 
                   // Book Name
                   Text(
@@ -1450,40 +1474,53 @@ class CheckinPage extends GetView<CheckinController> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(height: 8),
-
-                  // Due Date and Overdue Status
-                  Row(
-                    children: [
-                      Text(
-                        dueDate,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: isMobile ? 12 : 13,
+                  // Due Date and Overdue Status — only takes space when
+                  // there's actually a due date to show, instead of always
+                  // reserving a blank line.
+                  if (dueDate.isNotEmpty) ...[
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          dueDate,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: isMobile ? 12 : 13,
+                          ),
                         ),
-                      ),
-                      if (isOverdue) ...[
-                        SizedBox(width: 12),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            overdueStatus,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: isMobile ? 10 : 11,
-                              fontWeight: FontWeight.bold,
+                        if (isOverdue) ...[
+                          SizedBox(width: 12),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              overdueStatus,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isMobile ? 10 : 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
+                  ],
+
+                  // Checkout Date
+                  SizedBox(height: 2),
+                  Text(
+                    'चेक-आउट तिथि: $checkoutDate',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: isMobile ? 12 : 13,
+                    ),
                   ),
                 ],
               ),

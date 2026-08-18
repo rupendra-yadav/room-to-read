@@ -310,14 +310,21 @@ class StudentController extends GetxController {
       final connectivityService = Get.find<ConnectivityService>();
       final offlineDb = Get.find<OfflineDatabaseService>();
 
+      print(
+        '🔧 updateReadingLevel CALLED: studentCode=$studentCode, oldLevel=$oldLevel, newLevel=$newLevel, isOnline=${connectivityService.isOnline.value}',
+      );
+
       // Update UI immediately regardless of online/offline
       final index = students.indexWhere((s) => s.code == studentCode);
+      print(
+        '🔧 updateReadingLevel: found student at index=$index (students.length=${students.length})',
+      );
       if (index != -1) {
         students[index] = students[index].copyWith(readingLevel: newLevel);
         applyFilters();
       }
 
-      await offlineDb.database.then(
+      final localUpdateCount = await offlineDb.database.then(
         (db) => db.update(
           'students',
           {
@@ -329,11 +336,18 @@ class StudentController extends GetxController {
           whereArgs: [studentCode],
         ),
       );
+      print(
+        '🔧 updateReadingLevel: local SQLite rows updated=$localUpdateCount for code=$studentCode',
+      );
 
       if (connectivityService.isOnline.value) {
+        print('🔧 updateReadingLevel: taking ONLINE path, calling API...');
         await _sendReadingLevelToApi(studentCode, newLevel);
         print('✅ Reading level updated online for: $studentCode');
       } else {
+        print(
+          '🔧 updateReadingLevel: taking OFFLINE path, queuing for later sync...',
+        );
         await offlineDb.saveOfflineReadingLevelUpdate(
           studentCode: studentCode,
           oldLevel: oldLevel,
@@ -358,6 +372,7 @@ class StudentController extends GetxController {
       studentCode,
       newLevel,
     );
+    print('🔧 _sendReadingLevelToApi: result=$result');
     if (result['success'] != true) throw Exception(result['message']);
   }
 

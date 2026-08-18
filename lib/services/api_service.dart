@@ -306,11 +306,28 @@ class ApiService extends GetxService {
     int newReadingLevel,
   ) async {
     try {
-      // Use FormData to match other API calls and Postman format
-      var response = await GetConnect().post(ApiConfig.updateReadingLevelUrl, {
+      print('📤 updateReadingLevel: URL: ${ApiConfig.updateReadingLevelUrl}');
+      print(
+        '📤 updateReadingLevel: Body: {M1_CODE: $studentCode, cur_read_level: $newReadingLevel}',
+      );
+
+      // Use FormData (multipart/form-data) to match Postman and every other
+      // endpoint in this file — a bare Map here gets JSON-encoded by
+      // GetConnect instead, which the backend's $_POST-based PHP endpoint
+      // can't read, so it silently no-ops the update while still returning
+      // a "success" response.
+      final formData = FormData({
         'M1_CODE': studentCode,
         'cur_read_level': newReadingLevel.toString(),
       });
+      var response = await GetConnect().post(
+        ApiConfig.updateReadingLevelUrl,
+        formData,
+      );
+
+      print('📥 updateReadingLevel: Status: ${response.statusCode}');
+      print('📥 updateReadingLevel: Raw body: ${response.body}');
+      print('📥 updateReadingLevel: bodyString: ${response.bodyString}');
 
       if (response.statusCode == 200) {
         var data = response.body;
@@ -319,6 +336,8 @@ class ApiService extends GetxService {
         if (data is String) {
           data = jsonDecode(data);
         }
+
+        print('📥 updateReadingLevel: Parsed data: $data');
 
         if (data is Map) {
           // Check if the API response indicates success

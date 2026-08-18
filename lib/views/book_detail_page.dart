@@ -41,26 +41,54 @@ class _BookDetailPageState extends State<BookDetailPage> {
           );
         }
 
-        // Get fresh book details from controller, fallback to widget.book
+        // Get fresh book details from controller, fallback to widget.book.
+        // bookData's shape differs online vs offline: the online API uses
+        // avail_copy/total_copy/etc, but the offline-cached row (raw
+        // `books` table columns) only has txt1-txt5 (see Book.fromJson's
+        // mapping). Checking only the online key meant offline always
+        // fell through to a literal '0' string, which parses successfully
+        // to 0 and — since 0 isn't null — defeats the `?? widget.book...`
+        // fallback entirely. Check both key shapes, and don't default to
+        // '0' before parsing so a genuinely-missing field still falls back.
         final bookData = controller.bookDetails.value;
         final totalCopies = bookData != null
-            ? (int.tryParse(bookData['total_copy']?.toString() ?? '0') ??
+            ? (int.tryParse(
+                    (bookData['total_copy'] ?? bookData['txt2'])
+                            ?.toString() ??
+                        '',
+                  ) ??
                   widget.book.totalCopies)
             : widget.book.totalCopies;
         final availableCopies = bookData != null
-            ? (int.tryParse(bookData['avail_copy']?.toString() ?? '0') ??
+            ? (int.tryParse(
+                    (bookData['avail_copy'] ?? bookData['txt3'])
+                            ?.toString() ??
+                        '',
+                  ) ??
                   widget.book.availableCopies)
             : widget.book.availableCopies;
         final issuedCopies = bookData != null
-            ? (int.tryParse(bookData['issue_copy']?.toString() ?? '0') ??
+            ? (int.tryParse(
+                    (bookData['issue_copy'] ?? bookData['txt4'])
+                            ?.toString() ??
+                        '',
+                  ) ??
                   widget.book.issuedCopies)
             : widget.book.issuedCopies;
         final damagedCopies = bookData != null
-            ? (int.tryParse(bookData['damage_copy']?.toString() ?? '0') ??
+            ? (int.tryParse(
+                    (bookData['damage_copy'] ?? bookData['txt5'])
+                            ?.toString() ??
+                        '',
+                  ) ??
                   widget.book.damagedCopies)
             : widget.book.damagedCopies;
         final lostCopies = bookData != null
-            ? (int.tryParse(bookData['lost_copy']?.toString() ?? '0') ??
+            ? (int.tryParse(
+                    (bookData['lost_copy'] ?? bookData['txt1'])
+                            ?.toString() ??
+                        '',
+                  ) ??
                   widget.book.lostCopies)
             : widget.book.lostCopies;
 

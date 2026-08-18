@@ -1086,6 +1086,12 @@ class HybridApiService extends GetxService {
           return {
             'F4_PARTY1N': t['student_name'],
             'F4_PARTYN': t['book_name'],
+            // Book ID for the reports page — book_id is the numeric book
+            // identifier consistently populated for both checkout and
+            // checkin rows; book_code is unreliable here since a pending
+            // checkin's book_code column actually holds the checkout's
+            // transaction line code, not the book's own ID.
+            'F4_PARTY_NO': t['book_id'] ?? t['book_code'],
             'F4_LCODE': t['book_code'],
             'F4_TXT2': t['class_name'],
             'F4_BT': bt,

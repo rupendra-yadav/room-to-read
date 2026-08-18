@@ -939,8 +939,14 @@ class OfflineDatabaseService extends GetxService {
       List<dynamic> args = [teacherId];
 
       if (className != null && className.isNotEmpty) {
-        where += ' AND className = ?';
-        args.add(className);
+        // Lenient LIKE match instead of exact equality — className here is
+        // cached from the transaction's own F4_TXT2/F4_TXT1 field, whose
+        // exact string format relative to the grade dropdown's value
+        // (Grade.name) isn't guaranteed to match exactly. An exact-match
+        // filter silently returned zero cached rows for the same reason
+        // this already bit the checked-out-books offline query.
+        where += ' AND className LIKE ?';
+        args.add('%$className%');
       }
 
       final rows = await db.query(
@@ -1639,6 +1645,37 @@ class OfflineDatabaseService extends GetxService {
     } catch (e) {
       print('❌ Error clearing offline data: $e');
     }
+  }
+
+  /// Wipes every locally cached table — pending transactions AND the
+  /// downloaded master data (students/books/classes/etc). Unlike
+  /// clearOfflineData() (which only clears pending/transaction tables so a
+  /// user can keep working offline with their existing cache),
+  /// this is for a full reset, e.g. paired with logging the user out.
+  Future<void> wipeAllOfflineData() async {
+    final db = await database;
+    const tables = [
+      'offline_transactions_enhanced',
+      'offline_transactions',
+      'checked_out_books',
+      'reading_level_updates',
+      'book_status_updates',
+      'students',
+      'books',
+      'classes',
+      'grades_cache',
+      'cico_report_cache',
+      'user_profile',
+      'app_cache',
+    ];
+    for (final table in tables) {
+      try {
+        await db.delete(table);
+      } catch (e) {
+        print('⚠️ Error clearing table $table: $e');
+      }
+    }
+    print('✅ Wiped all locally cached data');
   }
 
   Future<List<Map<String, dynamic>>> getPendingSyncItems() async {

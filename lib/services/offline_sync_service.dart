@@ -209,16 +209,7 @@ class OfflineSyncService extends GetxService {
 
       syncStatus.value = 'ऑफलाइन सिंक पूरा हुआ';
 
-      final pendingLevels = await _offlineDb.getPendingReadingLevelUpdates();
-for (final u in pendingLevels) {
-  try {
-    final r = await _apiService.updateReadingLevel(u['student_code'], u['new_level']);
-    if (r['success'] == true) {
-      await _offlineDb.markReadingLevelUpdateSynced(u['id']);
-      totalSuccessCount++;
-    }
-  } catch (_) {}
-}
+      totalSuccessCount += await _syncPendingReadingLevels();
 
       // ✅ Mark sync as completed for listeners
       if (totalSuccessCount > 0) {
@@ -589,6 +580,14 @@ for (final u in pendingLevels) {
         }
       }
 
+      // The quick "बल्क सिंक" button used to only push checkout/checkin
+      // transactions — a reading-level edit made offline would stay
+      // "pending" forever unless the user happened to run the full
+      // "ऑफलाइन सिंक" flow instead, and a student with a stray pending
+      // update permanently shadows their real server value (see
+      // HybridApiService.getStudents()'s merge logic).
+      totalSuccessCount += await _syncPendingReadingLevels();
+
       // Screens (e.g. the check-in page) listen to lastSyncCompletedAt to
       // know when to refresh — without this, the "बल्क सिंक" button never
       // triggered that refresh, unlike the full offline-sync flow.
@@ -612,6 +611,26 @@ for (final u in pendingLevels) {
         'failureCount': 0,
       };
     }
+  }
+
+  /// Pushes any not-yet-synced reading-level edits to the server and marks
+  /// them synced. Returns the number successfully pushed.
+  Future<int> _syncPendingReadingLevels() async {
+    var synced = 0;
+    final pendingLevels = await _offlineDb.getPendingReadingLevelUpdates();
+    for (final u in pendingLevels) {
+      try {
+        final r = await _apiService.updateReadingLevel(
+          u['student_code'],
+          u['new_level'],
+        );
+        if (r['success'] == true) {
+          await _offlineDb.markReadingLevelUpdateSynced(u['id']);
+          synced++;
+        }
+      } catch (_) {}
+    }
+    return synced;
   }
 
   /// ✅ NEW: Mark check-in as synced and update checked_out_books table
@@ -1120,7 +1139,15 @@ for (final u in pendingLevels) {
               'id': code,
               'code': code,
               'name': s['M1_NAME']?.toString() ?? '',
-              'className': s['M1_GROUP2N']?.toString() ?? '',
+              // M1_OPP is the confirmed grade field (see Student.fromJson);
+              // M1_GROUP2N isn't even a real column in the backend schema,
+              // so using it as the only source here left className empty
+              // for every student downloaded through this full-sync path.
+              'className':
+                  (s['M1_OPP']?.toString().isNotEmpty == true
+                      ? s['M1_OPP'].toString()
+                      : s['M1_GROUP2N']?.toString()) ??
+                  '',
               'readingLevel':
                   local?['readingLevel'] ??
                   int.tryParse(s['M1_TXT2']?.toString() ?? '') ??

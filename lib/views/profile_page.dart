@@ -129,6 +129,34 @@ class ProfilePage extends GetView<ProfileController> {
                     //   title: 'School Name',
                     //   value: user.sch,
                     // ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: controller.resyncAllData,
+                        icon: const Icon(Icons.sync),
+                        label: const Text('ऑफलाइन के लिए सभी डेटा रीसिंक करें'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: controller.deleteAllDataAndLogout,
+                        icon: const Icon(Icons.delete_forever),
+                        label: const Text('सभी डेटा हटाएं और लॉगआउट करें'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
